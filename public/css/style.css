@@ -1,0 +1,190 @@
+  :root {
+    color-scheme: dark;
+    --bg: #1B1229;
+    --purple: #8B5CF6;
+    --pink: #E4789B;
+    --text: #F3EEFA;
+    --online: #7FBF8F;
+    --panel: #251A38;
+    --panel-2: #2E2143;
+    --border: #3A2B52;
+    --muted: #B8A9CC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Inter", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  h1, .brand { font-family: "Fraunces", Georgia, serif; font-weight: 500; }
+
+  header {
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
+  #status-wrap { display: flex; align-items: center; gap: 10px; }
+  #status { font-size: 13px; color: var(--muted); }
+  .online-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--online);
+    display: none; flex: none;
+  }
+  .online-dot.on { display: inline-block; }
+
+  input, button {
+    font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+  }
+  input {
+    background: var(--panel); color: var(--text); flex: 1; min-width: 160px;
+  }
+  input::placeholder { color: var(--muted); }
+  button { cursor: pointer; font-weight: 600; color: var(--text); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    border: none; color: #1B1229; font-weight: 700;
+  }
+  .btn-secondary { background: var(--panel-2); border: 1px solid var(--border); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+  /* ---------- join ---------- */
+  #join-section { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+  #join-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+  #name-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---------- app shell ---------- */
+  #app { display: none; flex-direction: column; flex: 1; min-height: 0; }
+  #app.active { display: flex; }
+
+  #echo-banner {
+    margin: 12px 24px 0; padding: 10px 14px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 13px; color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  #echo-banner button {
+    background: transparent; border: none; color: var(--muted); font-size: 16px;
+    padding: 0 4px; font-weight: 400; line-height: 1;
+  }
+
+  /* ---------- stage ---------- */
+  #stage {
+    position: relative; flex: 1; margin: 16px 24px; min-height: 320px;
+    background: var(--panel); border-radius: 16px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  #stage-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 32px;
+  }
+  #stage-empty[hidden] { display: none; }
+
+  .stage-bubbles { position: relative; width: 260px; height: 180px; }
+  .bubble {
+    position: absolute; top: 10px; width: 150px; height: 150px; border-radius: 50%;
+    opacity: .85; filter: blur(0.5px);
+    animation: floaty 6s ease-in-out infinite;
+    transition: transform 1.1s ease, left 1.1s ease;
+  }
+  .bubble.purple {
+    left: 0; background: radial-gradient(circle at 32% 30%, #b79bfa, var(--purple));
+    animation-delay: 0s;
+  }
+  .bubble.pink {
+    left: 110px; background: radial-gradient(circle at 32% 30%, #f2b0c6, var(--pink));
+    animation-delay: .4s;
+  }
+  .bubble-glow {
+    position: absolute; left: 80px; top: 30px; width: 110px; height: 110px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(243,238,250,.55), rgba(243,238,250,0) 70%);
+    opacity: 0; transition: opacity 1.1s ease;
+    pointer-events: none;
+  }
+  .stage-bubbles.merged .bubble.purple { transform: translateX(38px); }
+  .stage-bubbles.merged .bubble.pink { transform: translateX(-38px); }
+  .stage-bubbles.merged .bubble-glow { opacity: 1; }
+
+  @keyframes floaty {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -14px; }
+  }
+
+  .stage-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .stage-actions button { padding: 14px 22px; font-size: 15px; border-radius: 12px; }
+
+  #stage-main { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  #stage-main[hidden] { display: none; }
+  #stage-main video {
+    width: 100%; height: 100%; object-fit: contain; border-radius: 16px; background: #000;
+  }
+
+  /* floating camera bubbles, bottom-right of the stage */
+  #camera-bubbles {
+    position: absolute; right: 16px; bottom: 16px;
+    display: flex; gap: 10px; align-items: flex-end;
+    pointer-events: none;
+  }
+  .cam-bubble {
+    position: relative; width: 76px; height: 76px; border-radius: 50%;
+    overflow: hidden; background: #000; border: 2px solid var(--border);
+    flex: none;
+  }
+  .cam-bubble.bubble-purple { border-color: var(--purple); }
+  .cam-bubble.bubble-pink { border-color: var(--pink); }
+  .cam-bubble[hidden] { display: none; }
+  .cam-bubble video { width: 100%; height: 100%; object-fit: cover; }
+  .cam-bubble-label {
+    position: absolute; left: 0; right: 0; bottom: 0; text-align: center;
+    font-size: 9px; padding: 2px 0; background: rgba(0,0,0,.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cam-bubble-status {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 8px; padding: 4px; background: rgba(0,0,0,.72); line-height: 1.2;
+  }
+  .cam-bubble-status[hidden] { display: none; }
+
+  #stage-main .lost-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.55); font-size: 14px; text-align: center; padding: 24px;
+  }
+  #stage-main .lost-overlay[hidden] { display: none; }
+
+  /* ---------- reactions ---------- */
+  #reactions-layer {
+    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  }
+  .reaction-emoji {
+    position: absolute; bottom: 90px; font-size: 32px;
+    animation: reaction-float 1.6s ease-out forwards;
+  }
+  @keyframes reaction-float {
+    0% { opacity: 0; translate: 0 0; }
+    15% { opacity: 1; }
+    100% { opacity: 0; translate: 0 -140px; }
+  }
+
+  /* ---------- control bar ---------- */
+  #control-bar {
+    flex: none; display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px; border-top: 1px solid var(--border); background: var(--panel);
+    flex-wrap: wrap;
+  }
+  #control-bar button {
+    width: 46px; height: 46px; padding: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  #control-bar button.off { background: var(--border); color: var(--muted); }
+  #leave-btn { width: auto; border-radius: 23px; padding: 0 18px; background: #4a2436; border-color: #6b3448; }
+
+  .reaction-wrap { position: relative; }
+  #reaction-picker {
+    position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 8px; display: flex; gap: 6px;
+  }
+  #reaction-picker[hidden] { display: none; }
+  #reaction-picker button {
+    width: 38px; height: 38px; font-size: 18px; background: transparent; border: none; padding: 0;
+  }
