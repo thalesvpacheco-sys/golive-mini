@@ -4,89 +4,351 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>GoLive Mini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --bg: #1B1229;
+    --purple: #8B5CF6;
+    --pink: #E4789B;
+    --text: #F3EEFA;
+    --online: #7FBF8F;
+    --panel: #251A38;
+    --panel-2: #2E2143;
+    --border: #3A2B52;
+    --muted: #B8A9CC;
+  }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font-family: system-ui, sans-serif;
-    background: #09090b; color: #f4f4f5; min-height: 100vh;
+    margin: 0; font-family: system-ui, -apple-system, "Inter", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    display: flex; flex-direction: column;
   }
+  h1, .brand { font-family: "Fraunces", Georgia, serif; font-weight: 500; }
+
   header {
-    padding: 16px 24px; border-bottom: 1px solid #27272a;
+    padding: 16px 24px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
   }
-  header h1 { font-size: 18px; margin: 0; }
-  #status { font-size: 13px; color: #a1a1aa; }
-  #join-bar { display: flex; gap: 8px; padding: 16px 24px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
+  #status-wrap { display: flex; align-items: center; gap: 10px; }
+  #status { font-size: 13px; color: var(--muted); }
+  .online-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--online);
+    display: none; flex: none;
+  }
+  .online-dot.on { display: inline-block; }
+
   input, button {
-    font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid #3f3f46;
+    font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
   }
-  input { background: #18181b; color: #f4f4f5; flex: 1; min-width: 160px; }
-  button {
-    background: #3b82f6; color: white; border: none; cursor: pointer; font-weight: 600;
+  input {
+    background: var(--panel); color: var(--text); flex: 1; min-width: 160px;
   }
-  button:hover { background: #2563eb; }
-  button.secondary { background: #27272a; }
-  button.secondary:hover { background: #3f3f46; }
+  input::placeholder { color: var(--muted); }
+  button { cursor: pointer; font-weight: 600; color: var(--text); }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  #controls { display: none; gap: 8px; padding: 0 24px 16px; flex-wrap: wrap; }
-  #grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 12px; padding: 0 24px 24px;
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    border: none; color: #1B1229; font-weight: 700;
   }
-  .tile { position: relative; background: #18181b; border-radius: 12px; overflow: hidden; aspect-ratio: 16/9; }
-  .tile video { width: 100%; height: 100%; object-fit: cover; }
-  .tile .label {
-    position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,.6);
-    padding: 2px 8px; border-radius: 6px; font-size: 12px;
+  .btn-secondary { background: var(--panel-2); border: 1px solid var(--border); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+  /* ---------- join ---------- */
+  #join-section { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+  #join-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+  #name-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---------- app shell ---------- */
+  #app { display: none; flex-direction: column; flex: 1; min-height: 0; }
+  #app.active { display: flex; }
+
+  #echo-banner {
+    margin: 12px 24px 0; padding: 10px 14px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 13px; color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  #echo-banner button {
+    background: transparent; border: none; color: var(--muted); font-size: 16px;
+    padding: 0 4px; font-weight: 400; line-height: 1;
+  }
+
+  /* ---------- stage ---------- */
+  #stage {
+    position: relative; flex: 1; margin: 16px 24px; min-height: 320px;
+    background: var(--panel); border-radius: 16px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  #stage-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 32px;
+  }
+  #stage-empty[hidden] { display: none; }
+
+  .stage-bubbles { position: relative; width: 260px; height: 180px; }
+  .bubble {
+    position: absolute; top: 10px; width: 150px; height: 150px; border-radius: 50%;
+    opacity: .85; filter: blur(0.5px);
+    animation: floaty 6s ease-in-out infinite;
+    transition: transform 1.1s ease, left 1.1s ease;
+  }
+  .bubble.purple {
+    left: 0; background: radial-gradient(circle at 32% 30%, #b79bfa, var(--purple));
+    animation-delay: 0s;
+  }
+  .bubble.pink {
+    left: 110px; background: radial-gradient(circle at 32% 30%, #f2b0c6, var(--pink));
+    animation-delay: .4s;
+  }
+  .bubble-glow {
+    position: absolute; left: 80px; top: 30px; width: 110px; height: 110px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(243,238,250,.55), rgba(243,238,250,0) 70%);
+    opacity: 0; transition: opacity 1.1s ease;
+    pointer-events: none;
+  }
+  .stage-bubbles.merged .bubble.purple { transform: translateX(38px); }
+  .stage-bubbles.merged .bubble.pink { transform: translateX(-38px); }
+  .stage-bubbles.merged .bubble-glow { opacity: 1; }
+
+  @keyframes floaty {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -14px; }
+  }
+
+  .stage-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .stage-actions button { padding: 14px 22px; font-size: 15px; border-radius: 12px; }
+
+  #stage-main { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  #stage-main[hidden] { display: none; }
+  #stage-main video {
+    width: 100%; height: 100%; object-fit: contain; border-radius: 16px; background: #000;
+  }
+
+  /* floating camera bubbles, bottom-right of the stage */
+  #camera-bubbles {
+    position: absolute; right: 16px; bottom: 16px;
+    display: flex; gap: 10px; align-items: flex-end;
+    pointer-events: none;
+  }
+  .cam-bubble {
+    position: relative; width: 76px; height: 76px; border-radius: 50%;
+    overflow: hidden; background: #000; border: 2px solid var(--border);
+    flex: none;
+  }
+  .cam-bubble.bubble-purple { border-color: var(--purple); }
+  .cam-bubble.bubble-pink { border-color: var(--pink); }
+  .cam-bubble[hidden] { display: none; }
+  .cam-bubble video { width: 100%; height: 100%; object-fit: cover; }
+  .cam-bubble-label {
+    position: absolute; left: 0; right: 0; bottom: 0; text-align: center;
+    font-size: 9px; padding: 2px 0; background: rgba(0,0,0,.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cam-bubble-status {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 8px; padding: 4px; background: rgba(0,0,0,.72); line-height: 1.2;
+  }
+  .cam-bubble-status[hidden] { display: none; }
+
+  #stage-main .lost-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.55); font-size: 14px; text-align: center; padding: 24px;
+  }
+  #stage-main .lost-overlay[hidden] { display: none; }
+
+  /* ---------- reactions ---------- */
+  #reactions-layer {
+    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  }
+  .reaction-emoji {
+    position: absolute; bottom: 90px; font-size: 32px;
+    animation: reaction-float 1.6s ease-out forwards;
+  }
+  @keyframes reaction-float {
+    0% { opacity: 0; translate: 0 0; }
+    15% { opacity: 1; }
+    100% { opacity: 0; translate: 0 -140px; }
+  }
+
+  /* ---------- control bar ---------- */
+  #control-bar {
+    flex: none; display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px; border-top: 1px solid var(--border); background: var(--panel);
+    flex-wrap: wrap;
+  }
+  #control-bar button {
+    width: 46px; height: 46px; padding: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  #control-bar button.off { background: var(--border); color: var(--muted); }
+  #leave-btn { width: auto; border-radius: 23px; padding: 0 18px; background: #4a2436; border-color: #6b3448; }
+
+  .reaction-wrap { position: relative; }
+  #reaction-picker {
+    position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 8px; display: flex; gap: 6px;
+  }
+  #reaction-picker[hidden] { display: none; }
+  #reaction-picker button {
+    width: 38px; height: 38px; font-size: 18px; background: transparent; border: none; padding: 0;
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🔴 GoLive Mini</h1>
-  <div id="status">Não conectado</div>
+  <h1 class="brand">🔴 GoLive Mini</h1>
+  <div id="status-wrap">
+    <span id="status">Não conectado</span>
+    <span class="online-dot" id="online-dot"></span>
+    <button id="share-room-btn" class="btn-ghost" style="display:none;">🔗 Compartilhar sala</button>
+  </div>
 </header>
 
-<div id="join-bar">
-  <input id="room-input" placeholder="ID da sala (combine com a galera)" />
-  <button id="join-btn">Entrar na sala</button>
+<div id="join-section">
+  <div id="name-bar">
+    <input id="name-input" placeholder="Seu nome (aparece pros outros)" maxlength="24" />
+  </div>
+  <div id="join-bar">
+    <input id="room-input" placeholder="ID da sala (combine com a galera)" />
+    <button id="join-btn" class="btn-primary">Entrar na sala</button>
+  </div>
 </div>
 
-<div id="controls">
-  <button id="cam-btn" class="secondary">📷 Câmera</button>
-  <button id="screen-btn" class="secondary">🖥️ Compartilhar tela</button>
-  <button id="mute-btn" class="secondary">🎤 Mutar</button>
-</div>
+<div id="app">
+  <div id="echo-banner" hidden>
+    <span>🎧 Use fone se os dois estiverem com áudio ligado, pra evitar eco.</span>
+    <button id="echo-dismiss" aria-label="Fechar aviso">✕</button>
+  </div>
 
-<div id="grid"></div>
+  <div id="stage">
+    <div id="stage-empty">
+      <div class="stage-bubbles" id="stage-bubbles">
+        <div class="bubble purple"></div>
+        <div class="bubble pink"></div>
+        <div class="bubble-glow"></div>
+      </div>
+      <div class="stage-actions">
+        <button id="stage-screen-btn" class="btn-primary">🖥️ Compartilhar tela</button>
+        <button id="stage-cam-btn" class="btn-secondary">📷 Ativar câmera</button>
+      </div>
+    </div>
+    <div id="stage-main" hidden></div>
+    <div id="camera-bubbles"></div>
+    <div id="reactions-layer"></div>
+  </div>
+
+  <div id="control-bar">
+    <button id="mic-btn" class="off" title="Mic">🎤</button>
+    <button id="cam-btn" class="off" title="Câmera">📷</button>
+    <button id="screen-btn" class="btn-secondary" title="Compartilhar tela">🖥️</button>
+    <div class="reaction-wrap">
+      <button id="reaction-btn" class="btn-secondary" title="Reação">😀</button>
+      <div id="reaction-picker" hidden>
+        <button data-emoji="❤️">❤️</button>
+        <button data-emoji="😂">😂</button>
+        <button data-emoji="😱">😱</button>
+        <button data-emoji="👏">👏</button>
+      </div>
+    </div>
+    <button id="leave-btn">🚪 Sair</button>
+  </div>
+</div>
 
 <script>
   const socket = io();
   let peer, localStream;
-  const calls = {}; // peerId -> MediaConnection
-  let micEnabled = true;
+  let calls = {}; // peerId -> MediaConnection
+  const participants = new Map(); // peerId -> participant state
+  const leftPeers = new Set(); // peerIds that properly left (via 'user-left')
+  let nextColorIndex = 0;
+  let activeSharerId = null; // peerId currently on the big stage (null = nobody)
+  let micEnabled = false;
+  let camEnabled = false;
+  let isScreenSharing = false;
+  let myName = '';
+  let roomId = '';
 
-  const joinBar = document.getElementById('join-bar');
-  const controls = document.getElementById('controls');
+  const joinSection = document.getElementById('join-section');
+  const nameInput = document.getElementById('name-input');
+  const roomInput = document.getElementById('room-input');
   const statusEl = document.getElementById('status');
-  const grid = document.getElementById('grid');
+  const onlineDot = document.getElementById('online-dot');
+  const shareRoomBtn = document.getElementById('share-room-btn');
+  const appEl = document.getElementById('app');
+  const echoBanner = document.getElementById('echo-banner');
+  const stageEmpty = document.getElementById('stage-empty');
+  const stageBubbles = document.getElementById('stage-bubbles');
+  const stageMain = document.getElementById('stage-main');
+  const cameraBubbles = document.getElementById('camera-bubbles');
+  const reactionsLayer = document.getElementById('reactions-layer');
+  const micBtn = document.getElementById('mic-btn');
+  const camBtn = document.getElementById('cam-btn');
+  const screenBtn = document.getElementById('screen-btn');
+  const reactionBtn = document.getElementById('reaction-btn');
+  const reactionPicker = document.getElementById('reaction-picker');
+
+  // ---------- pre-fill: link de convite (?room=) tem prioridade, senao ultima sala usada ----------
+  (function prefillRoom() {
+    const params = new URLSearchParams(location.search);
+    const fromLink = params.get('room');
+    const lastRoom = localStorage.getItem('golive-last-room');
+    roomInput.value = fromLink || lastRoom || '';
+  })();
 
   document.getElementById('join-btn').onclick = joinRoom;
-  document.getElementById('cam-btn').onclick = () => switchStream('camera');
-  document.getElementById('screen-btn').onclick = () => switchStream('screen');
-  document.getElementById('mute-btn').onclick = toggleMic;
+  document.getElementById('stage-screen-btn').onclick = () => toggleScreenShare();
+  document.getElementById('stage-cam-btn').onclick = () => toggleCamera();
+  screenBtn.onclick = () => toggleScreenShare();
+  camBtn.onclick = () => toggleCamera();
+  micBtn.onclick = () => toggleMic();
+  document.getElementById('leave-btn').onclick = leaveRoom;
+  document.getElementById('echo-dismiss').onclick = () => echoBanner.hidden = true;
+
+  reactionBtn.onclick = () => { reactionPicker.hidden = !reactionPicker.hidden; };
+  reactionPicker.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      const emoji = b.dataset.emoji;
+      reactionPicker.hidden = true;
+      spawnReaction(emoji);
+      socket.emit('reaction', { emoji });
+    };
+  });
+
+  shareRoomBtn.onclick = async () => {
+    const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      shareRoomBtn.textContent = '✅ Link copiado!';
+    } catch (e) {
+      shareRoomBtn.textContent = '⚠️ Copia manual: ' + url;
+    }
+    setTimeout(() => shareRoomBtn.textContent = '🔗 Compartilhar sala', 2500);
+  };
 
   async function joinRoom() {
-    const roomId = document.getElementById('room-input').value.trim();
+    roomId = roomInput.value.trim();
     if (!roomId) return alert('Digita um ID de sala, mano.');
+    myName = nameInput.value.trim() || 'Alguém';
+
+    localStorage.setItem('golive-last-room', roomId);
 
     statusEl.textContent = 'Pedindo acesso à câmera/mic...';
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    addTile('local', localStream, 'Você');
+    // comeca desligado - o uso tipico e ter audio/video rolando em paralelo (Discord etc)
+    localStream.getAudioTracks().forEach(t => t.enabled = false);
+    localStream.getVideoTracks().forEach(t => t.enabled = false);
+
+    const local = ensureParticipant('local', { name: `${myName} (você)`, isLocal: true });
+    attachStream('local', localStream);
 
     peer = new Peer(undefined, {
       host: location.hostname,
@@ -97,61 +359,226 @@
 
     peer.on('open', (peerId) => {
       statusEl.textContent = `Conectado (sala: ${roomId})`;
-      joinBar.style.display = 'none';
-      controls.style.display = 'flex';
-      socket.emit('join-room', { roomId, peerId });
+      onlineDot.classList.add('on');
+      joinSection.style.display = 'none';
+      appEl.classList.add('active');
+      shareRoomBtn.style.display = 'inline-block';
+      showEchoBanner();
+      socket.emit('join-room', { roomId, peerId, name: myName });
     });
 
-    // alguem chegou depois de mim -> eu ligo pra ele
-    socket.on('user-joined', (newPeerId) => {
-      const call = peer.call(newPeerId, localStream);
+    // alguem chegou depois de mim -> eu ligo pra ele, mandando meu estado atual
+    socket.on('user-joined', ({ peerId: newPeerId, name }) => {
+      ensureParticipant(newPeerId, { name });
+      const call = peer.call(newPeerId, localStream, {
+        metadata: { name: myName, cam: camEnabled, mic: micEnabled, sharingScreen: isScreenSharing }
+      });
       registerCall(newPeerId, call);
     });
 
-    socket.on('user-left', (goneId) => removeTile(goneId));
+    socket.on('user-left', (goneId) => {
+      leftPeers.add(goneId);
+      removeParticipant(goneId);
+    });
 
-    // alguem me ligando -> eu atendo
+    socket.on('screen-share', ({ peerId: fromId, sharing }) => {
+      setSharingScreen(fromId, sharing);
+    });
+
+    socket.on('media-state', ({ peerId: fromId, cam, mic }) => {
+      const p = participants.get(fromId);
+      if (!p) return;
+      p.cam = cam; p.mic = mic;
+      updateBubbleVisibility(p);
+    });
+
+    socket.on('reaction', ({ emoji }) => spawnReaction(emoji));
+
+    // alguem me ligando -> eu atendo (recebo o estado dele via metadata)
     peer.on('call', (call) => {
       call.answer(localStream);
+      const meta = call.metadata || {};
+      const p = ensureParticipant(call.peer, { name: meta.name });
+      p.cam = !!meta.cam;
+      p.mic = !!meta.mic;
+      updateBubbleVisibility(p);
       registerCall(call.peer, call);
+      if (meta.sharingScreen) setSharingScreen(call.peer, true);
     });
   }
 
   function registerCall(peerId, call) {
     calls[peerId] = call;
-    call.on('stream', (remoteStream) => addTile(peerId, remoteStream, peerId.slice(0, 6)));
-    call.on('close', () => removeTile(peerId));
+    call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
+    call.on('close', () => {
+      // pode ser saida normal (user-left ja chegou/vai chegar) ou queda de conexao
+      setTimeout(() => {
+        if (!participants.has(peerId)) return; // ja removido normalmente
+        if (leftPeers.has(peerId)) { removeParticipant(peerId); return; }
+        markConnectionLost(peerId);
+      }, 600);
+    });
   }
 
-  function addTile(id, stream, label) {
-    if (document.getElementById('tile-' + id)) return;
-    const tile = document.createElement('div');
-    tile.className = 'tile';
-    tile.id = 'tile-' + id;
-    tile.innerHTML = `<video autoplay playsinline ${id === 'local' ? 'muted' : ''}></video><span class="label">${label}</span>`;
-    tile.querySelector('video').srcObject = stream;
-    grid.appendChild(tile);
+  // ---------- participantes / bolhas ----------
+
+  function ensureParticipant(peerId, opts = {}) {
+    if (participants.has(peerId)) return participants.get(peerId);
+    const idx = nextColorIndex++;
+    const color = idx % 2 === 0 ? 'purple' : 'pink';
+    const bubbleEl = buildBubble(peerId, color, opts.name || peerId.slice(0, 6));
+    const p = {
+      peerId, color, name: opts.name || peerId.slice(0, 6),
+      cam: false, mic: false, sharingScreen: false,
+      bubbleEl, videoEl: bubbleEl.querySelector('video'), lost: false,
+      isLocal: !!opts.isLocal
+    };
+    participants.set(peerId, p);
+    cameraBubbles.appendChild(bubbleEl);
+    updateBubbleVisibility(p);
+    maybeMergeBubbles();
+    return p;
   }
 
-  function removeTile(id) {
-    const tile = document.getElementById('tile-' + id);
-    if (tile) tile.remove();
-    delete calls[id];
+  function buildBubble(peerId, color, label) {
+    const el = document.createElement('div');
+    el.className = `cam-bubble bubble-${color}`;
+    el.id = 'bubble-' + peerId;
+    el.hidden = true;
+    el.innerHTML = `
+      <video autoplay playsinline ${peerId === 'local' ? 'muted' : ''}></video>
+      <span class="cam-bubble-label">${escapeHtml(label)}</span>
+      <span class="cam-bubble-status" hidden>Conexão perdida, tentando reconectar...</span>
+    `;
+    return el;
+  }
+
+  function attachStream(peerId, stream) {
+    const p = ensureParticipant(peerId);
+    p.stream = stream;
+    p.videoEl.srcObject = stream;
+  }
+
+  function updateBubbleVisibility(p) {
+    if (p.sharingScreen) { p.bubbleEl.hidden = true; return; }
+    p.bubbleEl.hidden = p.lost ? false : !p.cam;
+  }
+
+  function setSharingScreen(peerId, sharing) {
+    const p = participants.get(peerId);
+    if (!p) return;
+    p.sharingScreen = sharing;
+
+    if (sharing) {
+      // so uma pessoa por vez ocupa o palco grande; quem estava sai
+      if (activeSharerId && activeSharerId !== peerId) {
+        const prev = participants.get(activeSharerId);
+        if (prev) { prev.sharingScreen = false; demoteFromStage(prev); }
+      }
+      activeSharerId = peerId;
+      promoteToStage(p);
+    } else {
+      if (activeSharerId === peerId) activeSharerId = null;
+      demoteFromStage(p);
+    }
+
+    stageEmpty.hidden = !!activeSharerId;
+  }
+
+  function promoteToStage(p) {
+    stageMain.innerHTML = '';
+    stageMain.appendChild(p.videoEl);
+    if (p.lost) stageMain.appendChild(buildLostOverlay());
+    stageMain.hidden = false;
+    p.bubbleEl.hidden = true;
+  }
+
+  function demoteFromStage(p) {
+    if (p.videoEl.parentElement === stageMain) {
+      p.bubbleEl.prepend(p.videoEl);
+    }
+    if (activeSharerId === null) stageMain.hidden = true;
+    updateBubbleVisibility(p);
+  }
+
+  function buildLostOverlay() {
+    const el = document.createElement('div');
+    el.className = 'lost-overlay';
+    el.textContent = 'Conexão perdida, tentando reconectar...';
+    return el;
+  }
+
+  function markConnectionLost(peerId) {
+    const p = participants.get(peerId);
+    if (!p) return;
+    p.lost = true;
+    if (p.sharingScreen && p.videoEl.parentElement === stageMain) {
+      stageMain.appendChild(buildLostOverlay());
+    } else {
+      p.bubbleEl.querySelector('.cam-bubble-status').hidden = false;
+      p.bubbleEl.hidden = false;
+    }
+  }
+
+  function removeParticipant(peerId) {
+    const p = participants.get(peerId);
+    if (!p) return;
+    if (activeSharerId === peerId) {
+      activeSharerId = null;
+      stageMain.hidden = true;
+      stageMain.innerHTML = '';
+      stageEmpty.hidden = false;
+    }
+    p.bubbleEl.remove();
+    participants.delete(peerId);
+    delete calls[peerId];
+    maybeMergeBubbles();
+  }
+
+  function maybeMergeBubbles() {
+    // a segunda pessoa entrando na sala = local + mais um participante
+    stageBubbles.classList.toggle('merged', participants.size >= 2);
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  // ---------- controles ----------
+
+  function toggleMic() {
+    if (!localStream) return;
+    micEnabled = !micEnabled;
+    localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+    micBtn.classList.toggle('off', !micEnabled);
+    micBtn.textContent = micEnabled ? '🎤' : '🔇';
+    socket.emit('media-state', { cam: camEnabled, mic: micEnabled });
+  }
+
+  function toggleCamera() {
+    if (!localStream || isScreenSharing) return;
+    camEnabled = !camEnabled;
+    localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+    camBtn.classList.toggle('off', !camEnabled);
+    const local = participants.get('local');
+    if (local) { local.cam = camEnabled; updateBubbleVisibility(local); }
+    socket.emit('media-state', { cam: camEnabled, mic: micEnabled });
   }
 
   // troca a fonte de video (camera <-> tela) sem derrubar as chamadas
-  async function switchStream(type) {
-    let newStream;
+  async function toggleScreenShare() {
+    if (isScreenSharing) { await stopScreenShare(); return; }
+
+    let screenStream;
     try {
-      newStream = type === 'screen'
-        ? await navigator.mediaDevices.getDisplayMedia({ video: true })
-        : await navigator.mediaDevices.getUserMedia({ video: true });
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     } catch (e) { return; } // usuario cancelou o picker
 
-    const newVideoTrack = newStream.getVideoTracks()[0];
+    const newVideoTrack = screenStream.getVideoTracks()[0];
     const oldVideoTrack = localStream.getVideoTracks()[0];
 
-    // troca em cada conexao ja aberta (nao precisa renegociar do zero)
     Object.values(calls).forEach((call) => {
       const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
       if (sender) sender.replaceTrack(newVideoTrack);
@@ -160,18 +587,94 @@
     localStream.removeTrack(oldVideoTrack);
     oldVideoTrack.stop();
     localStream.addTrack(newVideoTrack);
-    document.querySelector('#tile-local video').srcObject = localStream;
+    participants.get('local').videoEl.srcObject = localStream;
 
-    // se parar de compartilhar tela pelo botao nativo do navegador, volta pra camera
-    if (type === 'screen') {
-      newVideoTrack.onended = () => switchStream('camera');
-    }
+    isScreenSharing = true;
+    setSharingScreen('local', true);
+    socket.emit('screen-share', { sharing: true });
+    camBtn.disabled = true;
+
+    // se parar de compartilhar tela pelo botao nativo do navegador
+    newVideoTrack.onended = () => stopScreenShare();
   }
 
-  function toggleMic() {
-    micEnabled = !micEnabled;
-    localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
-    document.getElementById('mute-btn').textContent = micEnabled ? '🎤 Mutar' : '🔇 Mutado';
+  async function stopScreenShare() {
+    if (!isScreenSharing) return;
+    let camStream;
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    } catch (e) { return; }
+
+    const newVideoTrack = camStream.getVideoTracks()[0];
+    newVideoTrack.enabled = camEnabled;
+    const oldVideoTrack = localStream.getVideoTracks()[0];
+
+    Object.values(calls).forEach((call) => {
+      const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender) sender.replaceTrack(newVideoTrack);
+    });
+
+    localStream.removeTrack(oldVideoTrack);
+    oldVideoTrack.stop();
+    localStream.addTrack(newVideoTrack);
+    participants.get('local').videoEl.srcObject = localStream;
+
+    isScreenSharing = false;
+    setSharingScreen('local', false);
+    socket.emit('screen-share', { sharing: false });
+    camBtn.disabled = false;
+  }
+
+  function spawnReaction(emoji) {
+    const el = document.createElement('span');
+    el.className = 'reaction-emoji';
+    el.textContent = emoji;
+    el.style.left = `calc(${30 + Math.random() * 40}% - 16px)`;
+    reactionsLayer.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function showEchoBanner() {
+    echoBanner.hidden = false;
+    setTimeout(() => echoBanner.hidden = true, 8000);
+  }
+
+  function leaveRoom() {
+    Object.values(calls).forEach(c => { try { c.close(); } catch (e) {} });
+    calls = {};
+    if (peer) { peer.destroy(); peer = null; }
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    socket.removeAllListeners('user-joined');
+    socket.removeAllListeners('user-left');
+    socket.removeAllListeners('screen-share');
+    socket.removeAllListeners('media-state');
+    socket.removeAllListeners('reaction');
+    socket.disconnect();
+
+    participants.forEach(p => p.bubbleEl.remove());
+    participants.clear();
+    leftPeers.clear();
+    nextColorIndex = 0;
+    activeSharerId = null;
+    micEnabled = false;
+    camEnabled = false;
+    isScreenSharing = false;
+
+    stageMain.hidden = true;
+    stageMain.innerHTML = '';
+    stageEmpty.hidden = false;
+    stageBubbles.classList.remove('merged');
+    micBtn.classList.add('off'); micBtn.textContent = '🎤';
+    camBtn.classList.add('off'); camBtn.disabled = false;
+    reactionPicker.hidden = true;
+
+    appEl.classList.remove('active');
+    joinSection.style.display = 'flex';
+    statusEl.textContent = 'Não conectado';
+    onlineDot.classList.remove('on');
+    shareRoomBtn.style.display = 'none';
+
+    socket.connect();
   }
 </script>
 
