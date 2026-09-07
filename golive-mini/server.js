@@ -10,7 +10,6 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// broker do WebRTC (troca as "cartas de endereco" dos peers)
 const peerServer = ExpressPeerServer(server, { path: '/' });
 app.use('/peerjs', peerServer);
 
@@ -18,20 +17,33 @@ app.use('/peerjs', peerServer);
 const rooms = {};
 
 io.on('connection', (socket) => {
-  socket.on('join-room', ({ roomId, peerId }) => {
+  socket.on('join-room', ({ roomId, peerId, name }) => {
     socket.data.roomId = roomId;
     socket.data.peerId = peerId;
     socket.join(roomId);
 
     if (!rooms[roomId]) rooms[roomId] = new Set();
 
-    // avisa a quem ja esta na sala que chegou gente nova
-    // (quem ja esta na sala que vai ligar pro novato -> monta o mesh sem duplicar chamada)
-    socket.to(roomId).emit('user-joined', peerId);
+    socket.to(roomId).emit('user-joined', { peerId, name });
 
     rooms[roomId].add(peerId);
-
     io.to(roomId).emit('room-size', rooms[roomId].size);
+  });
+
+  // repassa avisos de estado (tela compartilhada, mic/cam ligado) pro resto da sala
+  socket.on('screen-share', ({ sharing }) => {
+    const { roomId, peerId } = socket.data || {};
+    if (roomId) socket.to(roomId).emit('screen-share', { peerId, sharing });
+  });
+
+  socket.on('media-state', ({ kind, enabled }) => {
+    const { roomId, peerId } = socket.data || {};
+    if (roomId) socket.to(roomId).emit('media-state', { peerId, kind, enabled });
+  });
+
+  socket.on('reaction', ({ emoji }) => {
+    const { roomId, peerId } = socket.data || {};
+    if (roomId) socket.to(roomId).emit('reaction', { peerId, emoji });
   });
 
   socket.on('disconnect', () => {
