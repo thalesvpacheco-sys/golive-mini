@@ -4,6 +4,17 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#1B1229" />
+<script>
+  // aplica o tema salvo ANTES de qualquer CSS pintar a tela — script inline
+  // e síncrono de propósito (roda antes do <link rel="stylesheet">). Sem
+  // isso, a tela nasceria sempre roxa por uma fração de segundo e só
+  // trocaria pro tema salvo depois que o módulo JS carregasse — um "flash"
+  // visível toda vez que a pessoa abrir o app com tema branco/preto salvo.
+  try {
+    var t = localStorage.getItem('golive-theme');
+    if (t === 'white' || t === 'black') document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
 <title>GoLive Mini</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,7 +38,7 @@
       <button id="quality-btn" class="btn-ghost" title="Qualidade da transmissão" aria-label="Qualidade da transmissão" data-i18n-title="quality.title" data-i18n-aria="quality.title">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
       </button>
-      <div id="quality-picker" hidden>
+      <div id="quality-picker" class="popover-card" hidden>
         <button data-quality="high" data-i18n="quality.high">Alta (60fps)</button>
         <button data-quality="standard" data-i18n="quality.standard">Padrão (30fps)</button>
         <p class="quality-note" data-i18n="quality.note">Vale a partir da próxima vez que compartilhar a tela.</p>
@@ -39,6 +50,25 @@
     <button id="share-room-btn" class="btn-ghost" style="display:none;" aria-label="Compartilhar sala" data-i18n-aria="share.button">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M8.5 13.5l-2 2a3.5 3.5 0 0 0 5 5l3-3a3.5 3.5 0 0 0 0-5"/><path d="M15.5 10.5l2-2a3.5 3.5 0 0 0-5-5l-3 3a3.5 3.5 0 0 0 0 5"/></svg>
     </button>
+    <div class="reaction-wrap">
+      <button id="theme-btn" class="btn-ghost" title="Tema" aria-label="Tema" data-i18n-title="theme.title" data-i18n-aria="theme.title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/></svg>
+      </button>
+      <div id="theme-picker" class="popover-card" hidden>
+        <button data-theme-option="purple">
+          <span class="theme-swatch theme-swatch-purple" aria-hidden="true"></span>
+          <span data-i18n="theme.purple">Roxo</span>
+        </button>
+        <button data-theme-option="white">
+          <span class="theme-swatch theme-swatch-white" aria-hidden="true"></span>
+          <span data-i18n="theme.white">Branco</span>
+        </button>
+        <button data-theme-option="black">
+          <span class="theme-swatch theme-swatch-black" aria-hidden="true"></span>
+          <span data-i18n="theme.black">Preto</span>
+        </button>
+      </div>
+    </div>
   </div>
 </header>
 

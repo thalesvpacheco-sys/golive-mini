@@ -52,6 +52,11 @@ const STRINGS = {
   'quality.standard': { pt: 'Padrão (30fps)', en: 'Standard (30fps)' },
   'quality.note': { pt: 'Vale a partir da próxima vez que compartilhar a tela.', en: 'Applies the next time you share your screen.' },
 
+  'theme.title': { pt: 'Tema', en: 'Theme' },
+  'theme.purple': { pt: 'Roxo', en: 'Purple' },
+  'theme.white': { pt: 'Branco', en: 'White' },
+  'theme.black': { pt: 'Preto', en: 'Black' },
+
   'toast.joined': { pt: '{name} entrou na sala', en: '{name} joined the room' },
   'toast.left': { pt: '{name} saiu da sala', en: '{name} left the room' },
 

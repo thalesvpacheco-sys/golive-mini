@@ -34,6 +34,14 @@
   --surface-3: var(--panel-3);
   --shadow-float: 0 10px 30px rgba(0, 0, 0, .45);
 
+  /* "véu" neutro usado em cima de qualquer superfície (fundo de repouso de
+     botão-ícone, hover, divisória) — em tema escuro é um branco bem fraco
+     (funciona como luz por cima do escuro); em tema claro precisa VIRAR um
+     preto bem fraco (luz por cima de claro não aparece). Sem isso, trocar
+     pro tema branco deixava botão/divisória invisíveis. */
+  --overlay-1: rgba(255, 255, 255, .08);
+  --overlay-2: rgba(255, 255, 255, .14);
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
@@ -51,6 +59,41 @@
      "profissional" pra quem trabalha com tech). */
   --font-brand: "Space Grotesk", "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* ---------- temas ----------
+   [data-theme] no <html>, trocado pelo botão de tema no header (ver
+   theme.js). Sem atributo = roxo (os valores do :root acima). A cor de
+   marca (--purple/--pink, os botões gradiente) fica IGUAL nos 3 temas —
+   é a identidade do GoLive Mini; o que muda é só a superfície (fundo,
+   painéis, texto, sombra). Se quiser que o acento mude junto, é só falar. */
+:root[data-theme="white"] {
+  color-scheme: light;
+  --bg: #F7F5FB;
+  --text: #241B33;
+  --muted: #6F6580;
+  --panel: #FFFFFF;
+  --panel-2: #F1EDF7;
+  --panel-3: #FFFFFF;
+  --border: #E3DDEE;
+  --overlay-1: rgba(30, 20, 50, .06);
+  --overlay-2: rgba(30, 20, 50, .1);
+  --shadow-float: 0 10px 30px rgba(60, 40, 90, .12);
+  --shadow-card: 0 24px 48px -24px rgba(60, 40, 90, .18);
+}
+:root[data-theme="black"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --text: #F5F3FA;
+  --muted: #9C93AD;
+  --panel: #0D0D12;
+  --panel-2: #16151C;
+  --panel-3: #1E1D26;
+  --border: #2A2833;
+  --overlay-1: rgba(255, 255, 255, .06);
+  --overlay-2: rgba(255, 255, 255, .1);
+  --shadow-float: 0 10px 30px rgba(0, 0, 0, .6);
+  --shadow-card: 0 24px 48px -24px rgba(0, 0, 0, .75);
 }
 
 * { box-sizing: border-box; }
@@ -172,8 +215,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   height: 40px; min-height: 40px; padding: 0 14px; border-radius: var(--radius-md);
   transition: background .12s ease, color .12s ease;
 }
-.btn-ghost:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
-#participants-btn.btn-ghost, #share-room-btn.btn-ghost, #quality-btn.btn-ghost { width: 40px; padding: 0; }
+.btn-ghost:hover { background: var(--overlay-1); color: var(--text); }
+#participants-btn.btn-ghost, #share-room-btn.btn-ghost, #quality-btn.btn-ghost, #theme-btn.btn-ghost { width: 40px; padding: 0; }
 
 /* ---------- join screen: card centralizado na tela toda ---------- */
 /* fundo com dois brilhos suaves (mesmas cores da marca) em vez de um preto
@@ -482,7 +525,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   width: fit-content; max-width: calc(100% - var(--space-4) * 2);
   margin: 0 auto calc(var(--space-3) + env(safe-area-inset-bottom));
   padding: var(--space-1);
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface-3) 88%, transparent);
   box-shadow: var(--shadow-float);
@@ -501,11 +544,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 #control-bar button {
   width: 40px; height: 40px; min-height: 40px; padding: 0; border-radius: 30%;
   display: flex; align-items: center; justify-content: center; font-size: 18px;
-  background: rgba(255, 255, 255, .08); border: none; color: #EDEAF2;
+  background: var(--overlay-1); border: none; color: var(--text);
   transition: background .12s ease, transform .08s ease;
 }
 #control-bar button .icon { width: 16px; height: 16px; }
-#control-bar button:hover { background: rgba(255, 255, 255, .14); }
+#control-bar button:hover { background: var(--overlay-2); }
 #control-bar button:active { transform: scale(.94); }
 /* vermelho SÓLIDO e vibrante (não um vermelho "sujo" misturado com o painel
    roxo) — mic/câmera começam desativados (vocês já ficam de viva-voz no
@@ -568,7 +611,7 @@ body.cinema-mode #camera-bubbles { opacity: 0.7; }
    usam, em vez de deixar tudo numa fileira só sem hierarquia. */
 .control-divider {
   width: 1px; align-self: stretch; margin: 4px 2px;
-  background: rgba(255, 255, 255, .1);
+  background: var(--overlay-2);
 }
 
 .reaction-wrap { position: relative; }
@@ -586,27 +629,59 @@ body.cinema-mode #camera-bubbles { opacity: 0.7; }
   width: 38px; height: 38px; min-height: auto; font-size: 18px; background: transparent; border: none; padding: 0;
 }
 
-/* mesmo popover flutuante do reaction-picker, só que empilhado
-   verticalmente (dois presets + uma nota) em vez de uma fileira de emoji. */
-/* agora o botão de qualidade mora no cartão do topo (não mais na barra de
-   baixo), então o popover abre PRA BAIXO dele, não pra cima. */
-#quality-picker {
-  position: absolute; top: calc(100% + 8px); right: 0; left: auto;
-  background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-float);
+/* popover "vidro fosco" — fundo translúcido com blur em vez de cor sólida
+   opaca. Antes o popover de qualidade era um bloco --surface-3 100% opaco
+   com sombra forte, flutuando sozinho sem nenhuma ligação visual com o
+   ícone que abriu ele — lia como um "retângulo preto" solto na tela. Essa
+   classe é compartilhada por qualquer popover que "nasce" de um ícone do
+   header (qualidade, tema) — mesmo comportamento, mesma "seta" apontando
+   pro botão de origem. */
+.popover-card {
+  position: absolute; top: calc(100% + 10px); right: 0; left: auto;
+  background: color-mix(in srgb, var(--surface-3) 75%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  /* sombra mais contida que --shadow-float (que é pensada pra cards maiores
+     tipo o control-bar) — um popover pequeno não precisa "flutuar" tanto. */
+  box-shadow: 0 12px 28px -8px rgba(0, 0, 0, .4);
   padding: var(--space-2); display: flex; flex-direction: column; gap: 4px;
   width: 200px;
 }
-#quality-picker[hidden] { display: none; }
-#quality-picker button {
+/* setinha de 8px apontando pro ícone que abriu o popover — sem ela, o
+   popover parece um bloco solto caído do nada; com ela, fica óbvio que é
+   "filho" daquele botão específico. Mesmo truque de sempre: quadrado
+   rotacionado 45°, com o mesmo fundo/borda do card, escondendo dois lados. */
+.popover-card::before {
+  content: ''; position: absolute; top: -5px; right: 16px;
+  width: 10px; height: 10px; border-radius: 2px 0 0 0;
+  background: inherit; border: inherit; border-right: none; border-bottom: none;
+  transform: rotate(45deg);
+}
+.popover-card[hidden] { display: none; }
+.popover-card button {
   width: 100%; height: 38px; padding: 0 var(--space-2); font-size: 13px; text-align: left;
   background: transparent; border: none; border-radius: var(--radius-sm); color: var(--text);
+  display: flex; align-items: center; gap: var(--space-2);
 }
-#quality-picker button:hover { background: var(--panel-2); }
-#quality-picker button.active { background: color-mix(in srgb, var(--pink) 25%, transparent); color: var(--pink); }
+.popover-card button:hover { background: var(--overlay-1); }
+.popover-card button.active { background: color-mix(in srgb, var(--pink) 25%, transparent); color: var(--pink); }
 .quality-note {
   margin: 4px 2px 0; font-size: 11px; color: var(--muted); font-weight: 400; line-height: 1.4;
 }
+
+/* seletor de tema — cada opção mostra uma bolinha com a cor de fundo real
+   daquele tema (não é só texto "Roxo/Branco/Preto": a pessoa VÊ a
+   superfície antes de clicar). Os gradientes abaixo são fixos de propósito
+   (mostram a superfície de CADA tema), diferente do resto do app que usa
+   var(--bg) (a superfície do tema ATUAL). */
+.theme-swatch {
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  border: 1px solid var(--border);
+}
+.theme-swatch-purple { background: linear-gradient(135deg, #1B1229, #392B52); }
+.theme-swatch-white { background: linear-gradient(135deg, #FFFFFF, #F1EDF7); }
+.theme-swatch-black { background: linear-gradient(135deg, #000000, #1E1D26); }
 
 /* ---------- painel de participantes ---------- */
 #participants-panel {
@@ -617,7 +692,12 @@ body.cinema-mode #camera-bubbles { opacity: 0.7; }
      claro da escala (--surface-3), não o mesmo do palco atrás dele. */
   background: var(--surface-3); border-left: 1px solid var(--border);
   box-shadow: -16px 0 40px -20px rgba(0, 0, 0, .7);
-  z-index: 10;
+  /* PRECISA ficar acima do <header> (z-index:15) — o painel ocupa a faixa
+     de cima à direita, exatamente onde os ícones do header também ficam.
+     Com z-index menor que o header (era 10 vs 15), os ícones do header
+     desenhavam por CIMA do X de fechar do painel e roubavam o clique —
+     dava pra ver os dois grupos de ícone sobrepostos na mesma tela. */
+  z-index: 25;
   display: flex; flex-direction: column;
   padding-top: env(safe-area-inset-top);
 }

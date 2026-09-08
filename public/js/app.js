@@ -6,6 +6,7 @@ import { toggleMic, toggleCamera, toggleScreenShare, toggleFullscreen, toggleCin
 import { initRoom } from './room.js';
 import { ready as i18nReady } from './i18n.js';
 import { getQuality, setQuality } from './quality.js';
+import { getTheme, setTheme } from './theme.js';
 import { mountAnimatedGradientBackground } from './gradient-bg.js';
 
 mountAnimatedGradientBackground(dom.joinSection);
@@ -112,13 +113,37 @@ function renderQualityPicker() {
   });
 }
 renderQualityPicker();
-dom.qualityBtn.onclick = () => { dom.qualityPicker.hidden = !dom.qualityPicker.hidden; };
+dom.qualityBtn.onclick = () => {
+  dom.themePicker.hidden = true; // só um popover do header aberto por vez
+  dom.qualityPicker.hidden = !dom.qualityPicker.hidden;
+};
 dom.qualityPicker.querySelectorAll('button[data-quality]').forEach((b) => {
   b.onclick = () => {
     setQuality(b.dataset.quality);
     renderQualityPicker();
     applyQualityNow();
     dom.qualityPicker.hidden = true;
+  };
+});
+
+// popover de tema (roxo/branco/preto) — mesmo comportamento do de
+// qualidade: abre/fecha no clique, marca a opção ativa.
+function renderThemePicker() {
+  const current = getTheme();
+  dom.themePicker.querySelectorAll('button[data-theme-option]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeOption === current);
+  });
+}
+renderThemePicker();
+dom.themeBtn.onclick = () => {
+  dom.qualityPicker.hidden = true;
+  dom.themePicker.hidden = !dom.themePicker.hidden;
+};
+dom.themePicker.querySelectorAll('button[data-theme-option]').forEach((b) => {
+  b.onclick = () => {
+    setTheme(b.dataset.themeOption);
+    renderThemePicker();
+    dom.themePicker.hidden = true;
   };
 });
 // atalhos de teclado — só valem DENTRO da sala, e nunca quando o foco está
@@ -137,6 +162,7 @@ document.addEventListener('keydown', (e) => {
     toggleCinemaMode();
   } else if (e.key === 'Escape') {
     if (!dom.qualityPicker.hidden) dom.qualityPicker.hidden = true;
+    else if (!dom.themePicker.hidden) dom.themePicker.hidden = true;
     else if (!dom.participantsPanel.hidden) dom.participantsPanel.hidden = true;
   }
 });
