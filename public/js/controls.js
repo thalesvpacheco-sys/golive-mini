@@ -1,14 +1,17 @@
 // Controles de mídia: mic, câmera, compartilhamento de tela e reações.
 
 import { dom, state } from './state.js';
-import { setSharingScreen, updateBubbleVisibility } from './participants.js';
+import { setSharingScreen, updateBubbleVisibility, renderParticipantsList, initialOf } from './participants.js';
+import { videoConstraints } from './quality.js';
 
 export function toggleMic() {
   if (!state.localStream) return;
   state.micEnabled = !state.micEnabled;
   state.localStream.getAudioTracks().forEach(t => t.enabled = state.micEnabled);
   dom.micBtn.classList.toggle('off', !state.micEnabled);
-  dom.micBtn.textContent = state.micEnabled ? '🎤' : '🔇';
+  const local = state.participants.get('local');
+  if (local) local.mic = state.micEnabled;
+  renderParticipantsList();
   state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
 }
 
@@ -22,13 +25,36 @@ export function toggleCamera() {
   state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
 }
 
+// tela cheia no palco (vídeo/tela compartilhada) — ESC já sai sozinho, é
+// comportamento nativo do navegador, não precisa de botão extra pra isso.
+export function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    dom.stage.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
+// modo cinema: apaga as luzes ao redor do vídeo (igual "watch party" da
+// Discord/Netflix Party) sem mexer em nenhuma chamada — é só CSS num
+// atributo do <body>, então nem precisa avisar o outro lado.
+export function toggleCinemaMode(force) {
+  state.cinemaMode = typeof force === 'boolean' ? force : !state.cinemaMode;
+  document.body.classList.toggle('cinema-mode', state.cinemaMode);
+  dom.cinemaBtn?.classList.toggle('active', state.cinemaMode);
+}
+
 // troca a fonte de video (camera <-> tela) sem derrubar as chamadas
 export async function toggleScreenShare() {
   if (state.isScreenSharing) { await stopScreenShare(); return; }
 
   let screenStream;
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    // constraints do preset de qualidade escolhido em #quality-picker (ver
+    // quality.js) — "ideal" é só uma sugestão pro navegador/hardware, ele
+    // não trava se a máquina não aguentar 1080p/60fps, então é seguro pedir
+    // o máximo por padrão.
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints() });
   } catch (e) { return; } // usuario cancelou o picker
 
   const newVideoTrack = screenStream.getVideoTracks()[0];
@@ -51,6 +77,16 @@ export async function toggleScreenShare() {
 
   // se parar de compartilhar tela pelo botao nativo do navegador
   newVideoTrack.onended = () => stopScreenShare();
+}
+
+// se você trocar a qualidade NO MEIO de uma transmissão em andamento, tenta
+// aplicar na hora via applyConstraints (funciona pra maioria dos navegadores
+// pra frameRate/resolução) em vez de esperar o próximo compartilhamento —
+// bônus que o preset por si só não dá.
+export function applyQualityNow() {
+  if (!state.isScreenSharing || !state.localStream) return;
+  const track = state.localStream.getVideoTracks()[0];
+  track?.applyConstraints(videoConstraints()).catch(() => {});
 }
 
 export async function stopScreenShare() {
@@ -80,16 +116,56 @@ export async function stopScreenShare() {
   dom.camBtn.disabled = false;
 }
 
-export function spawnReaction(emoji) {
+// `name` é opcional — se vier, mostra um selinho com a inicial de quem
+// mandou por baixo do emoji (assim dá pra saber quem reagiu, igual
+// reações em chamada do Discord que aparecem coladas no avatar de quem
+// reagiu; aqui simplificamos pra um selo flutuante, já que nosso emoji
+// sobe solto pela tela e não fica "grudado" em ninguém).
+export function spawnReaction(emoji, name) {
+  const wrap = document.createElement('span');
+  wrap.className = 'reaction-emoji';
+  wrap.style.left = `calc(${30 + Math.random() * 40}% - 16px)`;
+  wrap.innerHTML = name
+    ? `<span class="reaction-emoji-icon">${emoji}</span><span class="reaction-emoji-name">${escapeForAttr(name)}</span>`
+    : emoji;
+  dom.reactionsLayer.appendChild(wrap);
+  wrap.addEventListener('animationend', () => wrap.remove());
+}
+
+function escapeForAttr(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// apontador ao vivo: clique na tela compartilhada manda um "ping" visual
+// pro outro lado, igual apontar numa videochamada de verdade. Reaproveita
+// a mesma reactions-layer (fica por cima do palco), então já ganha o
+// z-index e o "pointer-events: none" certos de graça.
+export function spawnPointerPing(xPercent, yPercent, name) {
   const el = document.createElement('span');
-  el.className = 'reaction-emoji';
-  el.textContent = emoji;
-  el.style.left = `calc(${30 + Math.random() * 40}% - 16px)`;
+  el.className = 'pointer-ping';
+  el.style.left = `${xPercent}%`;
+  el.style.top = `${yPercent}%`;
+  if (name) {
+    const label = document.createElement('span');
+    label.className = 'pointer-ping-label';
+    label.textContent = initialOf(name);
+    el.appendChild(label);
+  }
   dom.reactionsLayer.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
 }
 
-export function showEchoBanner() {
-  dom.echoBanner.hidden = false;
-  setTimeout(() => dom.echoBanner.hidden = true, 8000);
+// toast discreto (entrada/saída de participante) — some sozinho, a animação
+// de saída (toast-out, no CSS) que decide quando remover o elemento.
+export function showToast(message) {
+  if (!dom.toastLayer) return;
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  dom.toastLayer.appendChild(el);
+  el.addEventListener('animationend', (e) => {
+    if (e.animationName === 'toast-out') el.remove();
+  });
 }
