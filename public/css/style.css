@@ -132,7 +132,10 @@ header {
   display: none;
   flex: none;
   padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-3) 0;
-  justify-content: flex-end;
+  /* space-between (era flex-end) porque agora tem o cronômetro do lado
+     esquerdo — antes só existia o cartão de ícones à direita. */
+  justify-content: space-between;
+  align-items: center;
   /* precisa de position+z-index explícitos: sem isso, o <header> (estático)
      pinta ANTES do #stage (que é position:relative) na ordem de empilhamento
      do navegador — não importa que o header venha primeiro no HTML. Isso
@@ -153,6 +156,10 @@ header .online-dot.on, header .online-dot.reconnecting { display: none; }
 .logo-dot {
   width: 12px; height: 12px; border-radius: 50%; flex: none;
   background: linear-gradient(135deg, var(--purple), var(--pink));
+}
+#call-timer {
+  font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums;
+  font-family: var(--font-body); letter-spacing: .02em;
 }
 #status { font-size: 13px; color: var(--muted); }
 .online-dot {
@@ -216,7 +223,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   transition: background .12s ease, color .12s ease;
 }
 .btn-ghost:hover { background: var(--overlay-1); color: var(--text); }
-#participants-btn.btn-ghost, #share-room-btn.btn-ghost, #quality-btn.btn-ghost, #theme-btn.btn-ghost { width: 40px; padding: 0; }
+#participants-btn.btn-ghost, #share-room-btn.btn-ghost, #quality-btn.btn-ghost, #theme-btn.btn-ghost, #chat-btn.btn-ghost { width: 40px; padding: 0; }
 
 /* ---------- join screen: card centralizado na tela toda ---------- */
 /* fundo com dois brilhos suaves (mesmas cores da marca) em vez de um preto
@@ -683,30 +690,34 @@ body.cinema-mode #camera-bubbles { opacity: 0.7; }
 .theme-swatch-white { background: linear-gradient(135deg, #FFFFFF, #F1EDF7); }
 .theme-swatch-black { background: linear-gradient(135deg, #000000, #1E1D26); }
 
-/* ---------- painel de participantes ---------- */
-#participants-panel {
-  position: fixed; inset: 0 0 0 auto;
-  width: min(300px, 85vw); height: 100dvh;
+/* ---------- painel lateral (participantes e chat compartilham o mesmo
+   "corpo" — drawer fixo na direita, mesma camada/sombra/z-index) ---------- */
+.side-panel {
+  position: fixed;
+  /* Começa ABAIXO da fileira de ícones do header, não em cima dela — se ele
+     cobrisse até o topo (era `inset: 0 0 0 auto`), tampava os OUTROS ícones
+     do header (chat/participantes/tema) que ficam bem ali, e clicar num
+     ícone pra trocar de painel nunca funcionava: o painel aberto tapava o
+     próprio ícone que abriria o outro painel. 40px = altura dos botões do
+     header; var(--space-2) = respiro antes do painel começar. */
+  top: calc(var(--space-3) + env(safe-area-inset-top) + 40px + var(--space-2));
+  right: 0; bottom: 0; left: auto;
+  width: min(300px, 85vw);
   /* mesma camada flutuante do reaction-picker e do dock de fullscreen —
      é um drawer que aparece por cima de tudo, então merece o tom mais
      claro da escala (--surface-3), não o mesmo do palco atrás dele. */
   background: var(--surface-3); border-left: 1px solid var(--border);
+  border-top-left-radius: var(--radius-md);
   box-shadow: -16px 0 40px -20px rgba(0, 0, 0, .7);
-  /* PRECISA ficar acima do <header> (z-index:15) — o painel ocupa a faixa
-     de cima à direita, exatamente onde os ícones do header também ficam.
-     Com z-index menor que o header (era 10 vs 15), os ícones do header
-     desenhavam por CIMA do X de fechar do painel e roubavam o clique —
-     dava pra ver os dois grupos de ícone sobrepostos na mesma tela. */
-  z-index: 25;
+  z-index: 20;
   display: flex; flex-direction: column;
-  padding-top: env(safe-area-inset-top);
 }
-#participants-panel[hidden] { display: none; }
-#participants-panel-header {
+.side-panel[hidden] { display: none; }
+.side-panel-header {
   flex: none; display: flex; align-items: center; justify-content: space-between;
   padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border);
 }
-#participants-panel-header h2 {
+.side-panel-header h2 {
   margin: 0; font-size: 15px; font-family: var(--font-body); font-weight: 600;
   display: flex; align-items: center; gap: var(--space-1);
 }
@@ -714,7 +725,7 @@ body.cinema-mode #camera-bubbles { opacity: 0.7; }
   font-size: 12px; color: var(--muted); background: var(--panel-2);
   border-radius: 999px; padding: 1px 8px;
 }
-#participants-close {
+.side-panel-header button {
   background: transparent; border: none; color: var(--muted); min-height: auto;
   display: inline-flex; align-items: center; justify-content: center; padding: 4px;
 }
@@ -752,9 +763,46 @@ body.cinema-mode #camera-bubbles { opacity: 0.7; }
 .participant-row .name {
   flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.participant-row .mic-state { color: var(--danger); flex: none; }
-.participant-row .mic-state.on { color: var(--online); }
-.participant-row .mic-state .icon { width: 16px; height: 16px; }
+.participant-row .mic-state, .participant-row .cam-state { color: var(--danger); flex: none; }
+.participant-row .mic-state.on, .participant-row .cam-state.on { color: var(--online); }
+.participant-row .mic-state .icon, .participant-row .cam-state .icon { width: 16px; height: 16px; }
+
+/* ---------- chat ---------- */
+#chat-messages {
+  list-style: none; margin: 0; padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2); overflow-y: auto; flex: 1;
+}
+.chat-msg { display: flex; flex-direction: column; gap: 2px; max-width: 85%; }
+.chat-msg .chat-author { font-size: 11px; color: var(--muted); padding: 0 2px; }
+.chat-msg .chat-bubble {
+  background: var(--panel-2); border-radius: var(--radius-md); padding: 8px 12px;
+  font-size: 14px; line-height: 1.4; word-break: break-word;
+}
+/* mensagem própria: alinha à direita, fundo levemente rosado — mesma lógica
+   visual de qualquer app de chat (WhatsApp, iMessage etc). */
+.chat-msg.own { align-self: flex-end; align-items: flex-end; }
+.chat-msg.own .chat-bubble { background: color-mix(in srgb, var(--pink) 22%, var(--panel-2)); }
+.chat-msg.system { align-self: center; }
+.chat-msg.system .chat-bubble { background: transparent; color: var(--muted); font-size: 12px; padding: 2px 8px; }
+#chat-form {
+  flex: none; display: flex; gap: var(--space-2);
+  padding: var(--space-3); border-top: 1px solid var(--border);
+}
+#chat-input { flex: 1; min-width: 0; }
+#chat-send { flex: none; width: 40px; padding: 0; }
+/* bolinha vermelha no ícone de chat quando chega mensagem com o painel
+   fechado — mesmo princípio de badge de notificação de qualquer app.
+   position:relative direto no botão (não só no .reaction-wrap em volta) —
+   o botão às vezes é movido pra dentro da control-bar (modo fullscreen, ver
+   app.js), e se a referência de posicionamento fosse só o wrapper que ficou
+   pra trás, a bolinha "vazaria" pro canto da tela inteira. */
+#chat-btn { position: relative; }
+#chat-badge {
+  position: absolute; top: 4px; right: 4px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
+  border: 2px solid var(--bg);
+}
+#chat-badge[hidden] { display: none; }
 
 /* ---------- toasts (entrada/saída de participante) ---------- */
 #toast-layer {

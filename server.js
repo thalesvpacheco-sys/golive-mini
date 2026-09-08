@@ -81,9 +81,14 @@ io.on('connection', (socket) => {
 
     if (!rooms[roomId]) rooms[roomId] = new Set();
 
+    // isRejoin: esse peerId já estava na sala antes (é uma reconexão depois
+    // de uma queda, não gente nova de verdade) — o front usa isso pra não
+    // mostrar "Fulano entrou na sala" numa simples reconexão de rede.
+    const isRejoin = rooms[roomId].has(peerId);
+
     // avisa a quem ja esta na sala que chegou gente nova
     // (quem ja esta na sala que vai ligar pro novato -> monta o mesh sem duplicar chamada)
-    socket.to(roomId).emit('user-joined', { peerId, name: socket.data.name });
+    socket.to(roomId).emit('user-joined', { peerId, name: socket.data.name, isRejoin });
 
     rooms[roomId].add(peerId);
 
@@ -110,6 +115,27 @@ io.on('connection', (socket) => {
     const { roomId, peerId } = socket.data || {};
     if (!roomId || !ALLOWED_REACTIONS.has(emoji)) return;
     socket.to(roomId).emit('reaction', { peerId, emoji });
+  });
+
+  // apontador ao vivo — só repassa a posição (0-100, em %) pra sala; sem
+  // guardar nada nem validar demais, é só um ping visual passageiro.
+  socket.on('pointer', ({ x, y } = {}) => {
+    const { roomId, peerId } = socket.data || {};
+    if (!roomId || typeof x !== 'number' || typeof y !== 'number') return;
+    socket.to(roomId).emit('pointer', { peerId, x, y });
+  });
+
+  // chat de texto — sem histórico nenhum guardado no servidor (nem aqui,
+  // nem em disco): só repassa pra sala, igual reaction/pointer. Quem manda
+  // já desenha a própria mensagem na hora (ver app.js), então aqui só
+  // repassa pros OUTROS (socket.to, não io.to).
+  const MAX_CHAT_LENGTH = 500;
+  socket.on('chat-message', ({ text } = {}) => {
+    const { roomId, peerId } = socket.data || {};
+    if (!roomId || typeof text !== 'string') return;
+    const trimmed = text.trim().slice(0, MAX_CHAT_LENGTH);
+    if (!trimmed) return;
+    socket.to(roomId).emit('chat-message', { peerId, name: socket.data.name, text: trimmed });
   });
 
   socket.on('disconnect', () => {

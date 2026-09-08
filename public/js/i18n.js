@@ -57,6 +57,11 @@ const STRINGS = {
   'theme.white': { pt: 'Branco', en: 'White' },
   'theme.black': { pt: 'Preto', en: 'Black' },
 
+  'chat.title': { pt: 'Chat', en: 'Chat' },
+  'chat.close': { pt: 'Fechar chat', en: 'Close chat' },
+  'chat.placeholder': { pt: 'Digite uma mensagem', en: 'Type a message' },
+  'chat.send': { pt: 'Enviar', en: 'Send' },
+
   'toast.joined': { pt: '{name} entrou na sala', en: '{name} joined the room' },
   'toast.left': { pt: '{name} saiu da sala', en: '{name} left the room' },
 

@@ -7,6 +7,7 @@ import { initRoom } from './room.js';
 import { ready as i18nReady } from './i18n.js';
 import { getQuality, setQuality } from './quality.js';
 import { getTheme, setTheme } from './theme.js';
+import { appendChatMessage } from './chat.js';
 import { mountAnimatedGradientBackground } from './gradient-bg.js';
 
 mountAnimatedGradientBackground(dom.joinSection);
@@ -68,6 +69,10 @@ const participantsBtnAnchor = document.createComment('participants-btn-anchor');
 dom.participantsBtn.after(participantsBtnAnchor);
 const participantsPanelAnchor = document.createComment('participants-panel-anchor');
 dom.participantsPanel.after(participantsPanelAnchor);
+const chatBtnAnchor = document.createComment('chat-btn-anchor');
+dom.chatBtn.after(chatBtnAnchor);
+const chatPanelAnchor = document.createComment('chat-panel-anchor');
+dom.chatPanel.after(chatPanelAnchor);
 const toastLayerAnchor = document.createComment('toast-layer-anchor');
 dom.toastLayer.after(toastLayerAnchor);
 const leaveBtn = document.getElementById('leave-btn');
@@ -84,14 +89,18 @@ document.addEventListener('fullscreenchange', () => {
   dom.stage.classList.toggle('is-fullscreen', isFullscreen);
   if (isFullscreen) {
     dom.controlBar.insertBefore(dom.participantsBtn, leaveBtn);
+    dom.controlBar.insertBefore(dom.chatBtn, leaveBtn);
     dom.stage.appendChild(dom.controlBar);
     dom.stage.appendChild(dom.participantsPanel);
+    dom.stage.appendChild(dom.chatPanel);
     dom.stage.appendChild(dom.toastLayer);
     showStageControls();
   } else {
     participantsBtnAnchor.after(dom.participantsBtn);
+    chatBtnAnchor.after(dom.chatBtn);
     controlBarAnchor.after(dom.controlBar);
     participantsPanelAnchor.after(dom.participantsPanel);
+    chatPanelAnchor.after(dom.chatPanel);
     toastLayerAnchor.after(dom.toastLayer);
     clearTimeout(hideControlsTimer);
     dom.stage.classList.remove('controls-hidden');
@@ -101,8 +110,42 @@ dom.stage.addEventListener('mousemove', () => {
   if (dom.stage.classList.contains('is-fullscreen')) showStageControls();
 });
 
-dom.participantsBtn.onclick = () => { dom.participantsPanel.hidden = false; };
+dom.participantsBtn.onclick = () => {
+  dom.chatPanel.hidden = true; // só um painel lateral aberto por vez (os dois moram no mesmo lugar da tela)
+  dom.participantsPanel.hidden = false;
+};
 dom.participantsClose.onclick = () => { dom.participantsPanel.hidden = true; };
+
+dom.chatBtn.onclick = () => {
+  dom.participantsPanel.hidden = true;
+  dom.chatPanel.hidden = !dom.chatPanel.hidden;
+  if (!dom.chatPanel.hidden) {
+    state.unreadChat = 0;
+    dom.chatBadge.hidden = true;
+    dom.chatInput.focus();
+  }
+};
+dom.chatClose.onclick = () => { dom.chatPanel.hidden = true; };
+dom.chatForm.onsubmit = (e) => {
+  e.preventDefault();
+  const text = dom.chatInput.value.trim();
+  if (!text) return;
+  appendChatMessage({ text, own: true });
+  state.socket.emit('chat-message', { text });
+  dom.chatInput.value = '';
+};
+
+// cronômetro da chamada — atualiza a cada segundo a partir de
+// state.callStartedAt (marcado em room.js quando o peer abre).
+setInterval(() => {
+  if (!state.callStartedAt) return;
+  const totalSeconds = Math.floor((Date.now() - state.callStartedAt) / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  dom.callTimer.textContent = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}, 1000);
 
 // popover de qualidade da transmissão (abre/fecha no clique do botão, marca
 // a opção ativa com destaque visual) — agora mora no cartão do topo.
@@ -164,6 +207,7 @@ document.addEventListener('keydown', (e) => {
     if (!dom.qualityPicker.hidden) dom.qualityPicker.hidden = true;
     else if (!dom.themePicker.hidden) dom.themePicker.hidden = true;
     else if (!dom.participantsPanel.hidden) dom.participantsPanel.hidden = true;
+    else if (!dom.chatPanel.hidden) dom.chatPanel.hidden = true;
   }
 });
 

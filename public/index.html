@@ -31,6 +31,10 @@
 
 <header>
   <h1 class="brand"><span class="logo-dot" aria-hidden="true"></span>GoLive Mini</h1>
+  <!-- conta o tempo desde que a chamada começou (ver app.js) — fica do lado
+       OPOSTO do cartão de ícones (header agora é space-between, não mais
+       flex-end), igual referência de app de chamada "de verdade". -->
+  <span id="call-timer" aria-label="Duração da chamada">00:00</span>
   <div id="status-wrap">
     <span id="status" data-i18n="status.disconnected">Não conectado</span>
     <span class="online-dot" id="online-dot"></span>
@@ -44,12 +48,6 @@
         <p class="quality-note" data-i18n="quality.note">Vale a partir da próxima vez que compartilhar a tela.</p>
       </div>
     </div>
-    <button id="participants-btn" class="btn-ghost" style="display:none;" aria-label="Ver participantes" data-i18n-aria="aria.participants">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 8a3 3 0 1 0 0-5.9"/><path d="M23 21v-2a5 5 0 0 0-3.5-4.77"/></svg>
-    </button>
-    <button id="share-room-btn" class="btn-ghost" style="display:none;" aria-label="Compartilhar sala" data-i18n-aria="share.button">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M8.5 13.5l-2 2a3.5 3.5 0 0 0 5 5l3-3a3.5 3.5 0 0 0 0-5"/><path d="M15.5 10.5l2-2a3.5 3.5 0 0 0-5-5l-3 3a3.5 3.5 0 0 0 0 5"/></svg>
-    </button>
     <div class="reaction-wrap">
       <button id="theme-btn" class="btn-ghost" title="Tema" aria-label="Tema" data-i18n-title="theme.title" data-i18n-aria="theme.title">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/></svg>
@@ -69,6 +67,22 @@
         </button>
       </div>
     </div>
+    <!-- separa "preferências" (qualidade, tema) de "sala/pessoas" (participantes,
+         chat, link) — mesma ideia do .control-divider da barra de baixo,
+         igual a referência que agrupa ícones em blocos, não numa fileira só. -->
+    <div class="control-divider" aria-hidden="true"></div>
+    <button id="participants-btn" class="btn-ghost" style="display:none;" aria-label="Ver participantes" data-i18n-aria="aria.participants">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 8a3 3 0 1 0 0-5.9"/><path d="M23 21v-2a5 5 0 0 0-3.5-4.77"/></svg>
+    </button>
+    <div class="reaction-wrap">
+      <button id="chat-btn" class="btn-ghost" style="display:none;" title="Chat" aria-label="Chat" data-i18n-title="chat.title" data-i18n-aria="chat.title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span id="chat-badge" hidden aria-hidden="true"></span>
+      </button>
+    </div>
+    <button id="share-room-btn" class="btn-ghost" style="display:none;" aria-label="Compartilhar sala" data-i18n-aria="share.button">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M8.5 13.5l-2 2a3.5 3.5 0 0 0 5 5l3-3a3.5 3.5 0 0 0 0-5"/><path d="M15.5 10.5l2-2a3.5 3.5 0 0 0-5-5l-3 3a3.5 3.5 0 0 0 0 5"/></svg>
+    </button>
   </div>
 </header>
 
@@ -152,14 +166,30 @@
     </button>
   </div>
 
-  <aside id="participants-panel" hidden>
-    <div id="participants-panel-header">
+  <aside id="participants-panel" class="side-panel" hidden>
+    <div class="side-panel-header">
       <h2><span data-i18n="panel.title">Participantes</span> <span id="participants-count">0</span></h2>
       <button id="participants-close" aria-label="Fechar participantes" data-i18n-aria="aria.closeParticipants">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
       </button>
     </div>
     <ul id="participants-list"></ul>
+  </aside>
+
+  <aside id="chat-panel" class="side-panel" hidden>
+    <div class="side-panel-header">
+      <h2><span data-i18n="chat.title">Chat</span></h2>
+      <button id="chat-close" aria-label="Fechar chat" data-i18n-aria="chat.close">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+      </button>
+    </div>
+    <ul id="chat-messages" aria-live="polite"></ul>
+    <form id="chat-form">
+      <input id="chat-input" type="text" maxlength="500" data-i18n-placeholder="chat.placeholder" placeholder="Digite uma mensagem" autocomplete="off" />
+      <button id="chat-send" type="submit" aria-label="Enviar" data-i18n-aria="chat.send">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </form>
   </aside>
 </div>
 

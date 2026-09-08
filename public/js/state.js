@@ -31,6 +31,14 @@ export const dom = {
   participantsClose: document.getElementById('participants-close'),
   participantsList: document.getElementById('participants-list'),
   participantsCount: document.getElementById('participants-count'),
+  callTimer: document.getElementById('call-timer'),
+  chatBtn: document.getElementById('chat-btn'),
+  chatBadge: document.getElementById('chat-badge'),
+  chatPanel: document.getElementById('chat-panel'),
+  chatClose: document.getElementById('chat-close'),
+  chatMessages: document.getElementById('chat-messages'),
+  chatForm: document.getElementById('chat-form'),
+  chatInput: document.getElementById('chat-input'),
 };
 
 export const state = {
@@ -49,4 +57,6 @@ export const state = {
   myName: '',
   myColor: '',
   roomId: '',
+  callStartedAt: null, // Date.now() de quando o peer abriu — cronômetro do header
+  unreadChat: 0,
 };

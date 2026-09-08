@@ -4,6 +4,7 @@ import { dom, state } from './state.js';
 import { ensureParticipant, attachStream, removeParticipant, markConnectionLost, setSharingScreen, updateBubbleVisibility, renderParticipantsList, stopAllLevelMeters } from './participants.js';
 import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode } from './controls.js';
 import { t, translateServerMessage } from './i18n.js';
+import { appendChatMessage, clearChat } from './chat.js';
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
 
@@ -140,6 +141,10 @@ async function joinRoom() {
     dom.appEl.classList.add('active');
     dom.shareRoomBtn.style.display = 'inline-flex';
     dom.participantsBtn.style.display = 'inline-flex';
+    dom.chatBtn.style.display = 'inline-flex';
+    // só marca o início UMA vez — reconexão (peer reabrindo depois de uma
+    // queda) não é uma chamada nova, o cronômetro não deve voltar a zero.
+    if (!state.callStartedAt) state.callStartedAt = Date.now();
     rejoinIfNeeded(); // primeira entrada OU peer voltando de uma reconexão
   });
 
@@ -184,6 +189,17 @@ async function joinRoom() {
   state.socket.on('pointer', ({ peerId: fromId, x, y }) => {
     const sender = state.participants.get(fromId);
     spawnPointerPing(x, y, sender?.name);
+  });
+
+  // mensagem de chat de outra pessoa (a minha própria já foi desenhada na
+  // hora do envio, otimista — ver app.js). Se o painel estiver fechado,
+  // acende a bolinha vermelha no ícone em vez de deixar passar batido.
+  state.socket.on('chat-message', ({ peerId: fromId, name, text }) => {
+    appendChatMessage({ name: name || state.participants.get(fromId)?.name, text, own: false });
+    if (dom.chatPanel.hidden) {
+      state.unreadChat += 1;
+      dom.chatBadge.hidden = false;
+    }
   });
 
   state.socket.on('join-error', ({ message }) => {
@@ -232,6 +248,7 @@ function leaveRoom() {
   state.socket.removeAllListeners('media-state');
   state.socket.removeAllListeners('reaction');
   state.socket.removeAllListeners('pointer');
+  state.socket.removeAllListeners('chat-message');
   state.socket.disconnect();
 
   state.participants.forEach(p => p.bubbleEl.remove());
@@ -253,9 +270,16 @@ function leaveRoom() {
   dom.micBtn.classList.add('off');
   dom.camBtn.classList.add('off'); dom.camBtn.disabled = false;
   dom.qualityPicker.hidden = true;
+  dom.themePicker.hidden = true;
   dom.participantsList.innerHTML = '';
   dom.participantsCount.textContent = '0';
   dom.participantsPanel.hidden = true;
+  clearChat();
+  dom.chatPanel.hidden = true;
+  state.unreadChat = 0;
+  dom.chatBadge.hidden = true;
+  state.callStartedAt = null;
+  dom.callTimer.textContent = '00:00';
 
   dom.appEl.classList.remove('active');
   dom.joinSection.style.display = 'flex';
@@ -263,6 +287,7 @@ function leaveRoom() {
   dom.onlineDot.classList.remove('on', 'reconnecting');
   dom.shareRoomBtn.style.display = 'none';
   dom.participantsBtn.style.display = 'none';
+  dom.chatBtn.style.display = 'none';
 
   const joinBtn = document.getElementById('join-btn');
   joinBtn.disabled = false;

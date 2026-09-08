@@ -9,6 +9,10 @@ const MIC_ICON =
   '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>';
 const MIC_OFF_ICON =
   '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>';
+const CAM_ICON =
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/></svg>';
+const CAM_OFF_ICON =
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/><line x1="1" y1="2" x2="23" y2="22"/></svg>';
 
 // Reconstrói a lista do painel "Participantes" a partir do Map de estado —
 // chamada sempre que alguém entra/sai ou muda mic/câmera (ver room.js/controls.js).
@@ -28,6 +32,7 @@ export function renderParticipantsList() {
       <span class="avatar avatar-${p.color}">${escapeHtml(initialOf(p.name))}</span>
       <span class="name">${escapeHtml(p.name)}</span>
       <span class="mic-state ${p.mic ? 'on' : ''}">${p.mic ? MIC_ICON : MIC_OFF_ICON}</span>
+      <span class="cam-state ${p.cam ? 'on' : ''}">${p.cam ? CAM_ICON : CAM_OFF_ICON}</span>
       ${volumeControl}
     `;
     dom.participantsList.appendChild(li);
