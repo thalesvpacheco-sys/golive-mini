@@ -24,6 +24,8 @@ export const dom = {
   cinemaBtn: document.getElementById('cinema-btn'),
   qualityBtn: document.getElementById('quality-btn'),
   qualityPicker: document.getElementById('quality-picker'),
+  qualityStats: document.getElementById('quality-stats'),
+  qualityDot: document.getElementById('quality-dot'),
   themeBtn: document.getElementById('theme-btn'),
   themePicker: document.getElementById('theme-picker'),
   participantsBtn: document.getElementById('participants-btn'),

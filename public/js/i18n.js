@@ -51,6 +51,12 @@ const STRINGS = {
   'quality.high': { pt: 'Alta (60fps)', en: 'High (60fps)' },
   'quality.standard': { pt: 'Padrão (30fps)', en: 'Standard (30fps)' },
   'quality.note': { pt: 'Vale a partir da próxima vez que compartilhar a tela.', en: 'Applies the next time you share your screen.' },
+  'quality.statsLoss': { pt: 'perda', en: 'loss' },
+  'quality.statsEmpty': { pt: 'Medindo a conexão...', en: 'Measuring connection...' },
+  'quality.autoDowngraded': {
+    pt: 'Qualidade reduzida pra Padrão automaticamente — sua conexão não estava aguentando Alta.',
+    en: 'Quality automatically lowered to Standard — your connection could not keep up with High.',
+  },
 
   'theme.title': { pt: 'Tema', en: 'Theme' },
   // a chave 'theme.purple' é histórica (o tema padrão já foi roxo) — hoje ele

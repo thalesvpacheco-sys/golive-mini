@@ -2,7 +2,7 @@
 
 import { dom, state } from './state.js';
 import { setSharingScreen, updateBubbleVisibility, renderParticipantsList, initialOf } from './participants.js';
-import { videoConstraints } from './quality.js';
+import { videoConstraints, bitrateFor, getQuality } from './quality.js';
 
 export function toggleMic() {
   if (!state.localStream) return;
@@ -71,6 +71,7 @@ export async function toggleScreenShare() {
   state.participants.get('local').videoEl.srcObject = state.localStream;
 
   state.isScreenSharing = true;
+  applyBitrateCap();
   setSharingScreen('local', true);
   state.socket.emit('screen-share', { sharing: true });
   dom.camBtn.disabled = true;
@@ -87,6 +88,42 @@ export function applyQualityNow() {
   if (!state.isScreenSharing || !state.localStream) return;
   const track = state.localStream.getVideoTracks()[0];
   track?.applyConstraints(videoConstraints()).catch(() => {});
+  applyBitrateCap();
+}
+
+function videoSenderOf(call) {
+  return call.peerConnection?.getSenders().find((s) => s.track && s.track.kind === 'video');
+}
+
+// Teto de bitrate por conexão de saída. Sem isso o encoder do navegador não
+// tem limite e insiste no preset escolhido mesmo quando o upload não aguenta
+// — e em malha o upload é multiplicado por quantas pessoas estão na sala. O
+// congestionamento daí vira buffer, que é literalmente o "atraso de
+// segundos" que se sente do outro lado.
+export function applyBitrateCap() {
+  const maxBitrate = bitrateFor(getQuality());
+  if (!maxBitrate) return;
+  Object.values(state.calls).forEach((call) => {
+    const sender = videoSenderOf(call);
+    if (!sender) return;
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+    params.encodings[0].maxBitrate = maxBitrate;
+    sender.setParameters(params).catch(() => {});
+  });
+}
+
+// Volta ao "sem teto" ao sair do compartilhamento: o cap foi calculado pro
+// upload multiplicado da tela, e aplicá-lo à câmera (que consome muito menos)
+// só limitaria qualidade à toa.
+export function clearBitrateCap() {
+  Object.values(state.calls).forEach((call) => {
+    const sender = videoSenderOf(call);
+    if (!sender) return;
+    const params = sender.getParameters();
+    if (params.encodings?.[0]) delete params.encodings[0].maxBitrate;
+    sender.setParameters(params).catch(() => {});
+  });
 }
 
 export async function stopScreenShare() {
@@ -111,6 +148,7 @@ export async function stopScreenShare() {
   state.participants.get('local').videoEl.srcObject = state.localStream;
 
   state.isScreenSharing = false;
+  clearBitrateCap();
   setSharingScreen('local', false);
   state.socket.emit('screen-share', { sharing: false });
   dom.camBtn.disabled = false;

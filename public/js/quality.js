@@ -7,16 +7,24 @@
 
 const KEY = 'golive-quality';
 
+// maxBitrate é o TETO que a gente impõe ao encoder (ver applyBitrateCap em
+// controls.js) — não é constraint de mídia, é parâmetro do RTCRtpSender.
+// Sem teto, o navegador tenta empurrar o preset mesmo quando o upload não
+// aguenta; o congestionamento vira buffer, e buffer é exatamente o que se
+// sente como "atraso de segundos". Os valores são folgados pra qualidade
+// pretendida, mas cortam a faixa onde o encoder só estaria se afogando.
 export const PRESETS = {
   high: {
     frameRate: { ideal: 60, max: 60 },
     width: { ideal: 1920, max: 1920 },
     height: { ideal: 1080, max: 1080 },
+    maxBitrate: 6_000_000, // ~6 Mbps
   },
   standard: {
     frameRate: { ideal: 30, max: 30 },
     width: { ideal: 1280, max: 1280 },
     height: { ideal: 720, max: 720 },
+    maxBitrate: 2_000_000, // ~2 Mbps
   },
 };
 
@@ -29,6 +37,13 @@ export function setQuality(preset) {
   localStorage.setItem(KEY, preset);
 }
 
+// maxBitrate fica de fora de propósito: getDisplayMedia/getUserMedia esperam
+// MediaTrackConstraints, e bitrate não é uma delas — vai por outro caminho.
 export function videoConstraints() {
-  return { ...PRESETS[getQuality()] };
+  const { maxBitrate, ...constraints } = PRESETS[getQuality()];
+  return constraints;
+}
+
+export function bitrateFor(preset) {
+  return PRESETS[preset]?.maxBitrate;
 }

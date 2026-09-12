@@ -2,10 +2,11 @@
 
 import { dom, state } from './state.js';
 import { ensureParticipant, attachStream, removeParticipant, markConnectionLost, setSharingScreen, updateBubbleVisibility, renderParticipantsList, stopAllLevelMeters } from './participants.js';
-import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode } from './controls.js';
+import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode, applyBitrateCap } from './controls.js';
 import { t, translateServerMessage } from './i18n.js';
 import { appendChatMessage, clearChat } from './chat.js';
 import { isPanelOpen, resetPanels } from './panels.js';
+import { startNetworkMonitor, stopNetworkMonitor } from './network-stats.js';
 import { closePopovers } from './popovers.js';
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
@@ -144,6 +145,7 @@ async function joinRoom() {
     // só marca o início UMA vez — reconexão (peer reabrindo depois de uma
     // queda) não é uma chamada nova, o cronômetro não deve voltar a zero.
     if (!state.callStartedAt) state.callStartedAt = Date.now();
+    startNetworkMonitor(); // reinicia limpo a cada open, inclusive em reconexão
     rejoinIfNeeded(); // primeira entrada OU peer voltando de uma reconexão
   });
 
@@ -221,6 +223,10 @@ async function joinRoom() {
 
 function registerCall(peerId, call) {
   state.calls[peerId] = call;
+  // conexão nova nasce sem teto de bitrate; se já tem tela rolando, ela
+  // precisa entrar no mesmo limite das outras — senão é justamente essa que
+  // estoura o upload e derruba a qualidade de todo mundo.
+  if (state.isScreenSharing) applyBitrateCap();
   call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
   call.on('close', () => {
     // pode ser saida normal (user-left ja chegou/vai chegar) ou queda de conexao
@@ -241,6 +247,7 @@ function leaveRoom() {
   if (state.peer) { state.peer.destroy(); state.peer = null; }
   if (state.localStream) { state.localStream.getTracks().forEach(t => t.stop()); state.localStream = null; }
   stopAllLevelMeters();
+  stopNetworkMonitor();
   state.socket.removeAllListeners('user-joined');
   state.socket.removeAllListeners('user-left');
   state.socket.removeAllListeners('screen-share');

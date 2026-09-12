@@ -803,6 +803,27 @@ body.cinema-mode #camera-bubbles { opacity: .7; }
 }
 .popover-card button:hover { background: var(--overlay-1); }
 .popover-card button.active { background: var(--overlay-2); color: var(--accent); font-weight: 600; }
+/* leitura ao vivo da conexão dentro do popover de qualidade — mono porque é
+   número que muda sozinho a cada 2,5s e não pode ficar "dançando". */
+.popover-stats {
+  margin: 2px 2px 4px; padding-inline: var(--space-2);
+  font-family: var(--font-mono); font-size: 10.5px; line-height: 1.5;
+  color: var(--faint);
+}
+
+/* ponto de qualidade da conexão no botão de config: verde/âmbar/vermelho,
+   mesma gramática da bolinha de online no topbar. */
+#quality-btn { position: relative; }
+.quality-dot {
+  position: absolute; bottom: 3px; inset-inline-end: 3px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--online);
+  border: 2px solid var(--surface-1);
+}
+.quality-dot[hidden] { display: none; }
+.quality-dot.fair { background: var(--warn); }
+.quality-dot.poor { background: var(--danger); }
+
 .popover-note {
   margin: var(--space-1) 2px 2px; padding-inline: var(--space-2);
   font-size: 11px; color: var(--faint); line-height: 1.45;

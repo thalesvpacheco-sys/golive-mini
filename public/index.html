@@ -91,6 +91,7 @@
     <div class="topbar-actions">
       <button id="quality-btn" class="icon-btn" popovertarget="quality-picker" title="Qualidade da transmissão" aria-label="Qualidade da transmissão" data-i18n-title="quality.title" data-i18n-aria="quality.title">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <span id="quality-dot" class="quality-dot" hidden aria-hidden="true"></span>
       </button>
       <button id="theme-btn" class="icon-btn" popovertarget="theme-picker" title="Tema" aria-label="Tema" data-i18n-title="theme.title" data-i18n-aria="theme.title">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></svg>
@@ -121,6 +122,9 @@
       <button data-quality="high" data-i18n="quality.high">Alta (60fps)</button>
       <button data-quality="standard" data-i18n="quality.standard">Padrão (30fps)</button>
       <p class="popover-note" data-i18n="quality.note">Vale a partir da próxima vez que compartilhar a tela.</p>
+      <!-- leitura ao vivo do getStats(): só atualiza enquanto o popover está
+           aberto (ver o listener de 'toggle' em popovers.js). -->
+      <p class="popover-stats" id="quality-stats" aria-live="polite"></p>
     </div>
 
     <div id="theme-picker" class="popover-card" popover>
