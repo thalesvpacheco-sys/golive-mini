@@ -10,16 +10,16 @@
 // em", é o mesmo mecanismo, linha a linha.
 //
 // Cores: em vez do arco-íris neon do demo genérico, usamos os tokens da
-// nossa própria paleta (--bg, --purple, --pink) lidos do :root — assim o
-// fundo já nasce dark + detalhe rosa, do jeito que você pediu, e continua
-// sincronizado se a paleta mudar no futuro.
+// nossa própria paleta (--bg, --accent, --accent-2) lidos do :root — assim o
+// fundo nasce grafite com um respiro de íris/ciano, e continua sincronizado
+// sozinho se a paleta mudar no futuro.
 export function mountAnimatedGradientBackground(container, opts = {}) {
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   const {
     startingGap = 125,
     breathing = true,
-    gradientColors = [cssVar('--bg'), cssVar('--purple'), cssVar('--pink'), cssVar('--purple')],
+    gradientColors = [cssVar('--bg'), cssVar('--accent'), cssVar('--accent-2'), cssVar('--accent')],
     gradientStops = [30, 55, 80, 100],
     animationSpeed = 0.02,
     breathingRange = 6,

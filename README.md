@@ -9,15 +9,35 @@ Sala de tela/câmera/áudio em grupo, sem cadastro, self-hosted.
 ├── server.js              # Express + Socket.io (signaling) + PeerServer
 ├── .env.example           # variáveis de ambiente (copie pra .env)
 └── public/
-    ├── index.html          # markup
-    ├── css/style.css       # estilo
+    ├── index.html          # markup (regiões do bento)
+    ├── css/style.css       # estilo, tokens OKLCH e o grid do bento
     └── js/
         ├── app.js          # ponto de entrada, liga os botões
         ├── state.js        # estado global + referências de DOM
         ├── room.js         # entrar/sair da sala, signaling, peer connections
         ├── participants.js # bolhas de câmera e palco central
-        └── controls.js     # mic, câmera, tela e reações
+        ├── controls.js     # mic, câmera, tela, reações e toasts
+        ├── panels.js       # estado dos painéis (coluna no desktop, gaveta no celular)
+        ├── popovers.js     # escolha de qualidade e tema (abrir/fechar é nativo)
+        ├── fullscreen.js   # move a UI pra dentro de #stage em tela cheia
+        ├── shortcuts.js    # atalhos de teclado (M / F / C / Esc)
+        ├── chat.js         # mensagens do chat (sem histórico)
+        ├── audio-level.js  # detecta quem está falando de verdade (RMS)
+        ├── quality.js      # presets de resolução/fps do compartilhamento
+        ├── theme.js        # troca de tema (grafite / claro / preto)
+        ├── i18n.js         # textos pt/en + detecção de idioma
+        └── gradient-bg.js  # fundo animado da tela de entrada
 ```
+
+## Layout
+
+A tela de chamada é um bento de 3 colunas × 3 linhas: participantes à
+esquerda, chat à direita, e a coluna central empilhando config (topo), palco
+e controles. As colunas laterais são custom properties registradas com
+`@property`, o que as torna animáveis — abrir/fechar um painel desliza a
+coluna em vez de saltar. Abaixo de 1080px os painéis viram gaveta por cima
+do vídeo; o JS não sabe da diferença, só liga `data-people`/`data-chat` no
+`#app` e o CSS decide o que "aberto" significa.
 
 ## Rodar localmente
 

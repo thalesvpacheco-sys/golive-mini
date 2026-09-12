@@ -1,5 +1,5 @@
-// Chat de texto da sala — painel lateral (mesmo "corpo" visual do painel de
-// participantes, ver .side-panel em style.css). Mensagens só existem na
+// Chat de texto da sala — bloco do bento (mesmo "corpo" visual do painel de
+// participantes, ver .bento-panel em style.css). Mensagens só existem na
 // memória da aba: sem histórico, sem persistência — combina com o resto do
 // app, que é todo "efêmero" (a sala nem existe no servidor até alguém entrar).
 

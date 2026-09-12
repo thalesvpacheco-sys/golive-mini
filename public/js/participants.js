@@ -5,14 +5,14 @@ import { dom, state } from './state.js';
 import { startLevelMeter, stopLevelMeter, stopAllLevelMeters } from './audio-level.js';
 import { t } from './i18n.js';
 
+// um SVG só por ícone (não um par on/off) — o traço da barra some via CSS
+// quando o `<span>` pai tem a classe "on" (`.off-slash`, mesmo truque já
+// usado nos botões do control-bar — ver style.css), então não precisamos
+// manter duas cópias quase idênticas de cada ícone.
 const MIC_ICON =
-  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>';
-const MIC_OFF_ICON =
-  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>';
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line class="off-slash" x1="3" y1="3" x2="21" y2="21"/></svg>';
 const CAM_ICON =
-  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/></svg>';
-const CAM_OFF_ICON =
-  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/><line x1="1" y1="2" x2="23" y2="22"/></svg>';
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/><line class="off-slash" x1="1" y1="2" x2="23" y2="22"/></svg>';
 
 // Reconstrói a lista do painel "Participantes" a partir do Map de estado —
 // chamada sempre que alguém entra/sai ou muda mic/câmera (ver room.js/controls.js).
@@ -31,8 +31,8 @@ export function renderParticipantsList() {
     li.innerHTML = `
       <span class="avatar avatar-${p.color}">${escapeHtml(initialOf(p.name))}</span>
       <span class="name">${escapeHtml(p.name)}</span>
-      <span class="mic-state ${p.mic ? 'on' : ''}">${p.mic ? MIC_ICON : MIC_OFF_ICON}</span>
-      <span class="cam-state ${p.cam ? 'on' : ''}">${p.cam ? CAM_ICON : CAM_OFF_ICON}</span>
+      <span class="mic-state ${p.mic ? 'on' : ''}">${MIC_ICON}</span>
+      <span class="cam-state ${p.cam ? 'on' : ''}">${CAM_ICON}</span>
       ${volumeControl}
     `;
     dom.participantsList.appendChild(li);
@@ -53,7 +53,10 @@ function setSpeaking(peerId, speaking) {
 export function ensureParticipant(peerId, opts = {}) {
   if (state.participants.has(peerId)) return state.participants.get(peerId);
   const idx = state.nextColorIndex++;
-  const color = idx % 2 === 0 ? 'purple' : 'pink';
+  // íris e ciano ficam bem longe uma da outra no círculo cromático, então
+  // continuam distinguíveis inclusive pra quem tem daltonismo — diferente do
+  // par roxo/rosa anterior, que era praticamente a mesma cor pra alguns tipos.
+  const color = idx % 2 === 0 ? 'iris' : 'cyan';
   const bubbleEl = buildBubble(peerId, color, opts.name || peerId.slice(0, 6));
   const p = {
     peerId, color, name: opts.name || peerId.slice(0, 6),

@@ -5,6 +5,8 @@ import { ensureParticipant, attachStream, removeParticipant, markConnectionLost,
 import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode } from './controls.js';
 import { t, translateServerMessage } from './i18n.js';
 import { appendChatMessage, clearChat } from './chat.js';
+import { isPanelOpen, resetPanels } from './panels.js';
+import { closePopovers } from './popovers.js';
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
 
@@ -71,9 +73,9 @@ async function joinRoom() {
   if (joinBtn.disabled) return; // já tem um "Entrando..." em andamento (ex: Enter apertado 2x)
 
   const roomId = dom.roomInput.value.trim();
-  if (!roomId) return alert(t('alert.noRoom'));
+  if (!roomId) return showToast(t('alert.noRoom'));
   if (!ROOM_ID_PATTERN.test(roomId)) {
-    return alert(t('alert.invalidRoom'));
+    return showToast(t('alert.invalidRoom'));
   }
 
   joinBtn.disabled = true;
@@ -94,7 +96,7 @@ async function joinRoom() {
     // "Pedindo acesso..." travada pra sempre, sem nenhum aviso — pior tipo
     // de loading state, o que nunca termina e nunca explica por quê.
     console.error('getUserMedia falhou:', e);
-    alert(t('alert.mediaDenied'));
+    showToast(t('alert.mediaDenied'), { holdMs: 6000 }); // mensagem longa, precisa de mais tempo pra ler
     state.roomId = '';
     dom.statusEl.textContent = t('status.disconnected');
     joinBtn.disabled = false;
@@ -139,9 +141,6 @@ async function joinRoom() {
   state.peer.on('open', () => {
     dom.joinSection.style.display = 'none';
     dom.appEl.classList.add('active');
-    dom.shareRoomBtn.style.display = 'inline-flex';
-    dom.participantsBtn.style.display = 'inline-flex';
-    dom.chatBtn.style.display = 'inline-flex';
     // só marca o início UMA vez — reconexão (peer reabrindo depois de uma
     // queda) não é uma chamada nova, o cronômetro não deve voltar a zero.
     if (!state.callStartedAt) state.callStartedAt = Date.now();
@@ -196,14 +195,14 @@ async function joinRoom() {
   // acende a bolinha vermelha no ícone em vez de deixar passar batido.
   state.socket.on('chat-message', ({ peerId: fromId, name, text }) => {
     appendChatMessage({ name: name || state.participants.get(fromId)?.name, text, own: false });
-    if (dom.chatPanel.hidden) {
+    if (!isPanelOpen('chat')) {
       state.unreadChat += 1;
       dom.chatBadge.hidden = false;
     }
   });
 
   state.socket.on('join-error', ({ message }) => {
-    alert(message ? translateServerMessage(message) : t('alert.joinErrorDefault'));
+    showToast(message ? translateServerMessage(message) : t('alert.joinErrorDefault'));
     leaveRoom();
   });
 
@@ -269,13 +268,11 @@ function leaveRoom() {
   if (document.fullscreenElement === dom.stage) document.exitFullscreen?.();
   dom.micBtn.classList.add('off');
   dom.camBtn.classList.add('off'); dom.camBtn.disabled = false;
-  dom.qualityPicker.hidden = true;
-  dom.themePicker.hidden = true;
+  closePopovers();
   dom.participantsList.innerHTML = '';
   dom.participantsCount.textContent = '0';
-  dom.participantsPanel.hidden = true;
   clearChat();
-  dom.chatPanel.hidden = true;
+  resetPanels(); // volta pro padrão do tamanho de tela atual, não "tudo fechado"
   state.unreadChat = 0;
   dom.chatBadge.hidden = true;
   state.callStartedAt = null;
@@ -285,9 +282,6 @@ function leaveRoom() {
   dom.joinSection.style.display = 'flex';
   dom.statusEl.textContent = t('status.disconnected');
   dom.onlineDot.classList.remove('on', 'reconnecting');
-  dom.shareRoomBtn.style.display = 'none';
-  dom.participantsBtn.style.display = 'none';
-  dom.chatBtn.style.display = 'none';
 
   const joinBtn = document.getElementById('join-btn');
   joinBtn.disabled = false;

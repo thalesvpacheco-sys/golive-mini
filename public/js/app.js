@@ -2,13 +2,15 @@
 // Carregado como <script type="module"> no index.html.
 
 import { dom, state } from './state.js';
-import { toggleMic, toggleCamera, toggleScreenShare, toggleFullscreen, toggleCinemaMode, spawnPointerPing, applyQualityNow } from './controls.js';
+import { toggleMic, toggleCamera, toggleScreenShare, toggleFullscreen, toggleCinemaMode, spawnPointerPing } from './controls.js';
 import { initRoom } from './room.js';
 import { ready as i18nReady } from './i18n.js';
-import { getQuality, setQuality } from './quality.js';
-import { getTheme, setTheme } from './theme.js';
 import { appendChatMessage } from './chat.js';
 import { mountAnimatedGradientBackground } from './gradient-bg.js';
+import { initFullscreen } from './fullscreen.js';
+import { initPopovers } from './popovers.js';
+import { initShortcuts } from './shortcuts.js';
+import { togglePanel, setPanel, isPanelOpen, resetPanels } from './panels.js';
 
 mountAnimatedGradientBackground(dom.joinSection);
 
@@ -49,83 +51,22 @@ dom.stageMain.addEventListener('click', (e) => {
   state.socket.emit('pointer', { x: xPercent, y: yPercent });
 });
 
-// estilo Discord: em tela cheia, os controles (mic/câmera/compartilhar/sair)
-// continuam acessíveis por cima do vídeo — só ficam escondidos até o mouse
-// se mexer. A Fullscreen API do navegador só desenha o que está DENTRO do
-// elemento que virou tela cheia; tudo que fica fora (e #control-bar, no HTML,
-// é irmão de #stage, não filho) simplesmente some da tela. Por isso, ao
-// entrar em fullscreen, movemos o #control-bar de verdade pra dentro de
-// #stage (o CSS o transforma numa pílula flutuante nesse caso — ver
-// style.css) e devolvemos ele pro lugar original ao sair. Guardamos um
-// comentário como "marcador" de onde ele estava, já que mover um nó no DOM
-// não duplica nada nem perde os onclick já configurados nele.
-// mesma lógica vale pro botão de participantes (some do cabeçalho junto com
-// tudo mais) e pro próprio painel de participantes (é um <aside> fixed, mas
-// "fixed" não adianta se o elemento nem está sendo desenhado). Então na
-// prática tudo que precisa sobreviver ao fullscreen entra dentro de #stage.
-const controlBarAnchor = document.createComment('control-bar-anchor');
-dom.controlBar.after(controlBarAnchor);
-const participantsBtnAnchor = document.createComment('participants-btn-anchor');
-dom.participantsBtn.after(participantsBtnAnchor);
-const participantsPanelAnchor = document.createComment('participants-panel-anchor');
-dom.participantsPanel.after(participantsPanelAnchor);
-const chatBtnAnchor = document.createComment('chat-btn-anchor');
-dom.chatBtn.after(chatBtnAnchor);
-const chatPanelAnchor = document.createComment('chat-panel-anchor');
-dom.chatPanel.after(chatPanelAnchor);
-const toastLayerAnchor = document.createComment('toast-layer-anchor');
-dom.toastLayer.after(toastLayerAnchor);
-const leaveBtn = document.getElementById('leave-btn');
+initFullscreen();
 
-let hideControlsTimer = null;
-function showStageControls() {
-  dom.stage.classList.remove('controls-hidden');
-  clearTimeout(hideControlsTimer);
-  hideControlsTimer = setTimeout(() => dom.stage.classList.add('controls-hidden'), 2200);
-}
-document.addEventListener('fullscreenchange', () => {
-  const isFullscreen = document.fullscreenElement === dom.stage;
-  dom.fullscreenBtn.classList.toggle('is-fullscreen', isFullscreen);
-  dom.stage.classList.toggle('is-fullscreen', isFullscreen);
-  if (isFullscreen) {
-    dom.controlBar.insertBefore(dom.participantsBtn, leaveBtn);
-    dom.controlBar.insertBefore(dom.chatBtn, leaveBtn);
-    dom.stage.appendChild(dom.controlBar);
-    dom.stage.appendChild(dom.participantsPanel);
-    dom.stage.appendChild(dom.chatPanel);
-    dom.stage.appendChild(dom.toastLayer);
-    showStageControls();
-  } else {
-    participantsBtnAnchor.after(dom.participantsBtn);
-    chatBtnAnchor.after(dom.chatBtn);
-    controlBarAnchor.after(dom.controlBar);
-    participantsPanelAnchor.after(dom.participantsPanel);
-    chatPanelAnchor.after(dom.chatPanel);
-    toastLayerAnchor.after(dom.toastLayer);
-    clearTimeout(hideControlsTimer);
-    dom.stage.classList.remove('controls-hidden');
-  }
-});
-dom.stage.addEventListener('mousemove', () => {
-  if (dom.stage.classList.contains('is-fullscreen')) showStageControls();
-});
+resetPanels();
 
-dom.participantsBtn.onclick = () => {
-  dom.chatPanel.hidden = true; // só um painel lateral aberto por vez (os dois moram no mesmo lugar da tela)
-  dom.participantsPanel.hidden = false;
-};
-dom.participantsClose.onclick = () => { dom.participantsPanel.hidden = true; };
+dom.participantsBtn.onclick = () => togglePanel('people');
+dom.participantsClose.onclick = () => setPanel('people', false);
 
 dom.chatBtn.onclick = () => {
-  dom.participantsPanel.hidden = true;
-  dom.chatPanel.hidden = !dom.chatPanel.hidden;
-  if (!dom.chatPanel.hidden) {
+  togglePanel('chat');
+  if (isPanelOpen('chat')) {
     state.unreadChat = 0;
     dom.chatBadge.hidden = true;
     dom.chatInput.focus();
   }
 };
-dom.chatClose.onclick = () => { dom.chatPanel.hidden = true; };
+dom.chatClose.onclick = () => setPanel('chat', false);
 dom.chatForm.onsubmit = (e) => {
   e.preventDefault();
   const text = dom.chatInput.value.trim();
@@ -147,69 +88,8 @@ setInterval(() => {
   dom.callTimer.textContent = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }, 1000);
 
-// popover de qualidade da transmissão (abre/fecha no clique do botão, marca
-// a opção ativa com destaque visual) — agora mora no cartão do topo.
-function renderQualityPicker() {
-  const current = getQuality();
-  dom.qualityPicker.querySelectorAll('button[data-quality]').forEach((b) => {
-    b.classList.toggle('active', b.dataset.quality === current);
-  });
-}
-renderQualityPicker();
-dom.qualityBtn.onclick = () => {
-  dom.themePicker.hidden = true; // só um popover do header aberto por vez
-  dom.qualityPicker.hidden = !dom.qualityPicker.hidden;
-};
-dom.qualityPicker.querySelectorAll('button[data-quality]').forEach((b) => {
-  b.onclick = () => {
-    setQuality(b.dataset.quality);
-    renderQualityPicker();
-    applyQualityNow();
-    dom.qualityPicker.hidden = true;
-  };
-});
-
-// popover de tema (roxo/branco/preto) — mesmo comportamento do de
-// qualidade: abre/fecha no clique, marca a opção ativa.
-function renderThemePicker() {
-  const current = getTheme();
-  dom.themePicker.querySelectorAll('button[data-theme-option]').forEach((b) => {
-    b.classList.toggle('active', b.dataset.themeOption === current);
-  });
-}
-renderThemePicker();
-dom.themeBtn.onclick = () => {
-  dom.qualityPicker.hidden = true;
-  dom.themePicker.hidden = !dom.themePicker.hidden;
-};
-dom.themePicker.querySelectorAll('button[data-theme-option]').forEach((b) => {
-  b.onclick = () => {
-    setTheme(b.dataset.themeOption);
-    renderThemePicker();
-    dom.themePicker.hidden = true;
-  };
-});
-// atalhos de teclado — só valem DENTRO da sala, e nunca quando o foco está
-// num campo de texto (não faz sentido "M" mutar enquanto alguém digita o
-// nome na tela inicial, por exemplo).
-document.addEventListener('keydown', (e) => {
-  if (!dom.appEl.classList.contains('active')) return;
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
-  if (e.key === 'm' || e.key === 'M') {
-    toggleMic();
-  } else if (e.key === 'f' || e.key === 'F') {
-    toggleFullscreen();
-  } else if (e.key === 'c' || e.key === 'C') {
-    toggleCinemaMode();
-  } else if (e.key === 'Escape') {
-    if (!dom.qualityPicker.hidden) dom.qualityPicker.hidden = true;
-    else if (!dom.themePicker.hidden) dom.themePicker.hidden = true;
-    else if (!dom.participantsPanel.hidden) dom.participantsPanel.hidden = true;
-    else if (!dom.chatPanel.hidden) dom.chatPanel.hidden = true;
-  }
-});
+initPopovers();
+initShortcuts();
 
 // espera a detecção de idioma (IP -> pt/en) antes de "abrir a loja" — assim
 // o status inicial, os textos do formulário de entrada etc já nascem no

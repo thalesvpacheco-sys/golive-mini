@@ -157,13 +157,16 @@ export function spawnPointerPing(xPercent, yPercent, name) {
   el.addEventListener('animationend', () => el.remove());
 }
 
-// toast discreto (entrada/saída de participante) — some sozinho, a animação
-// de saída (toast-out, no CSS) que decide quando remover o elemento.
-export function showToast(message) {
+// toast discreto (entrada/saída de participante, erros de validação/mídia)
+// — some sozinho, a animação de saída (toast-out, no CSS) que decide quando
+// remover o elemento. `holdMs` deixa mensagens mais longas (ex: permissão de
+// câmera negada) ficarem visíveis por mais tempo que o padrão de ~2.6s.
+export function showToast(message, { holdMs } = {}) {
   if (!dom.toastLayer) return;
   const el = document.createElement('div');
   el.className = 'toast';
   el.textContent = message;
+  if (holdMs) el.style.setProperty('--toast-hold', `${holdMs}ms`);
   dom.toastLayer.appendChild(el);
   el.addEventListener('animationend', (e) => {
     if (e.animationName === 'toast-out') el.remove();

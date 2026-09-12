@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#1B1229" />
+<meta name="theme-color" content="#0E0F13" />
 <script>
   // aplica o tema salvo ANTES de qualquer CSS pintar a tela — script inline
   // e síncrono de propósito (roda antes do <link rel="stylesheet">). Sem
-  // isso, a tela nasceria sempre roxa por uma fração de segundo e só
-  // trocaria pro tema salvo depois que o módulo JS carregasse — um "flash"
-  // visível toda vez que a pessoa abrir o app com tema branco/preto salvo.
+  // isso, a tela nasceria sempre no tema padrão por uma fração de segundo e
+  // só trocaria pro tema salvo depois que o módulo JS carregasse — um
+  // "flash" visível toda vez que a pessoa abrir o app com outro tema salvo.
   try {
     var t = localStorage.getItem('golive-theme');
     if (t === 'white' || t === 'black') document.documentElement.dataset.theme = t;
@@ -18,7 +18,11 @@
 <title>GoLive Mini</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Inter pra tudo (com tracking negativo nos títulos, que é o que dá a
+     leitura "produto de engenharia") + JetBrains Mono só pros números que
+     mudam sozinhos: cronômetro e métricas. Número em fonte proporcional
+     "dança" a cada segundo; em mono, fica parado. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- lottie-web: o mesmo motor que o DotLottieReact (React) usa por baixo,
@@ -29,66 +33,15 @@
 </head>
 <body>
 
-<header>
-  <h1 class="brand"><span class="logo-dot" aria-hidden="true"></span>GoLive Mini</h1>
-  <!-- conta o tempo desde que a chamada começou (ver app.js) — fica do lado
-       OPOSTO do cartão de ícones (header agora é space-between, não mais
-       flex-end), igual referência de app de chamada "de verdade". -->
-  <span id="call-timer" aria-label="Duração da chamada">00:00</span>
-  <div id="status-wrap">
-    <span id="status" data-i18n="status.disconnected">Não conectado</span>
-    <span class="online-dot" id="online-dot"></span>
-    <div class="reaction-wrap">
-      <button id="quality-btn" class="btn-ghost" title="Qualidade da transmissão" aria-label="Qualidade da transmissão" data-i18n-title="quality.title" data-i18n-aria="quality.title">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-      </button>
-      <div id="quality-picker" class="popover-card" hidden>
-        <button data-quality="high" data-i18n="quality.high">Alta (60fps)</button>
-        <button data-quality="standard" data-i18n="quality.standard">Padrão (30fps)</button>
-        <p class="quality-note" data-i18n="quality.note">Vale a partir da próxima vez que compartilhar a tela.</p>
-      </div>
-    </div>
-    <div class="reaction-wrap">
-      <button id="theme-btn" class="btn-ghost" title="Tema" aria-label="Tema" data-i18n-title="theme.title" data-i18n-aria="theme.title">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/></svg>
-      </button>
-      <div id="theme-picker" class="popover-card" hidden>
-        <button data-theme-option="purple">
-          <span class="theme-swatch theme-swatch-purple" aria-hidden="true"></span>
-          <span data-i18n="theme.purple">Roxo</span>
-        </button>
-        <button data-theme-option="white">
-          <span class="theme-swatch theme-swatch-white" aria-hidden="true"></span>
-          <span data-i18n="theme.white">Branco</span>
-        </button>
-        <button data-theme-option="black">
-          <span class="theme-swatch theme-swatch-black" aria-hidden="true"></span>
-          <span data-i18n="theme.black">Preto</span>
-        </button>
-      </div>
-    </div>
-    <!-- separa "preferências" (qualidade, tema) de "sala/pessoas" (participantes,
-         chat, link) — mesma ideia do .control-divider da barra de baixo,
-         igual a referência que agrupa ícones em blocos, não numa fileira só. -->
-    <div class="control-divider" aria-hidden="true"></div>
-    <button id="participants-btn" class="btn-ghost" style="display:none;" aria-label="Ver participantes" data-i18n-aria="aria.participants">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 8a3 3 0 1 0 0-5.9"/><path d="M23 21v-2a5 5 0 0 0-3.5-4.77"/></svg>
-    </button>
-    <div class="reaction-wrap">
-      <button id="chat-btn" class="btn-ghost" style="display:none;" title="Chat" aria-label="Chat" data-i18n-title="chat.title" data-i18n-aria="chat.title">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span id="chat-badge" hidden aria-hidden="true"></span>
-      </button>
-    </div>
-    <button id="share-room-btn" class="btn-ghost" style="display:none;" aria-label="Compartilhar sala" data-i18n-aria="share.button">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M8.5 13.5l-2 2a3.5 3.5 0 0 0 5 5l3-3a3.5 3.5 0 0 0 0-5"/><path d="M15.5 10.5l2-2a3.5 3.5 0 0 0-5-5l-3 3a3.5 3.5 0 0 0 0 5"/></svg>
-    </button>
-  </div>
-</header>
+<!-- fora de #app de propósito: os toasts (erro de sala/mídia, entrou/saiu)
+     também aparecem na tela de entrada, antes de #app virar .active — ver
+     room.js. É position:fixed, então a posição no DOM não muda o layout. -->
+<div id="toast-layer" aria-live="polite"></div>
 
 <div id="join-section">
   <div class="join-hero">
     <div class="join-mascot" id="join-mascot" aria-hidden="true"></div>
+    <h1 class="brand"><span class="logo-dot" aria-hidden="true"></span>GoLive Mini</h1>
     <p class="join-tagline" data-i18n="join.tagline">Compartilhem a tela e assistam juntos, mesmo longe.</p>
   </div>
   <div class="join-card">
@@ -115,14 +68,96 @@
   </div>
 </div>
 
-<div id="app">
-  <div id="toast-layer" aria-live="polite"></div>
+<!-- ---------- bento ----------
+     3 colunas x 3 linhas: pessoas | (topo/palco/controles) | chat.
+     A coluna do meio carrega as três faixas, então a barra de config e o
+     dock de controles NÃO atravessam os painéis laterais — cada bloco é um
+     cartão independente com respiro em volta. As larguras das colunas
+     laterais são custom properties registradas (@property, ver style.css)
+     pra poderem ser animadas quando um painel abre/fecha.
+     data-people / data-chat guardam o estado dos painéis; quem decide se
+     "aberto" significa coluna do bento (desktop) ou gaveta por cima
+     (celular) é só o CSS — ver panels.js. -->
+<div id="app" data-people="closed" data-chat="closed">
 
-  <div id="stage">
+  <header id="topbar">
+    <div class="topbar-lead">
+      <span class="online-dot" id="online-dot"></span>
+      <span id="status" data-i18n="status.disconnected">Não conectado</span>
+    </div>
+
+    <span id="call-timer" aria-label="Duração da chamada">00:00</span>
+
+    <div class="topbar-actions">
+      <button id="quality-btn" class="icon-btn" popovertarget="quality-picker" title="Qualidade da transmissão" aria-label="Qualidade da transmissão" data-i18n-title="quality.title" data-i18n-aria="quality.title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
+      <button id="theme-btn" class="icon-btn" popovertarget="theme-picker" title="Tema" aria-label="Tema" data-i18n-title="theme.title" data-i18n-aria="theme.title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button id="share-room-btn" class="icon-btn" aria-label="Compartilhar sala" data-i18n-aria="share.button">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 15l6-6"/><path d="M8.5 13.5l-2 2a3.5 3.5 0 0 0 5 5l3-3a3.5 3.5 0 0 0 0-5"/><path d="M15.5 10.5l2-2a3.5 3.5 0 0 0-5-5l-3 3a3.5 3.5 0 0 0 0 5"/></svg>
+      </button>
+
+      <span class="control-divider" aria-hidden="true"></span>
+
+      <button id="participants-btn" class="icon-btn" aria-label="Ver participantes" data-i18n-aria="aria.participants">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/><path d="M17 8a3 3 0 1 0 0-5.9"/><path d="M23 21v-2a5 5 0 0 0-3.5-4.77"/></svg>
+      </button>
+      <button id="chat-btn" class="icon-btn" title="Chat" aria-label="Chat" data-i18n-title="chat.title" data-i18n-aria="chat.title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span id="chat-badge" hidden aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <!-- popovers nativos (atributo popover + popovertarget no botão): o
+         navegador cuida de abrir/fechar, Escape, clique-fora, e de jogar o
+         elemento na top layer — nada de z-index nem de fechar um quando o
+         outro abre na mão. A posição vem do CSS Anchor Positioning; onde
+         ele não existe ainda, o @supports em style.css cai pra uma folha
+         centralizada no topo (ver .popover-card). -->
+    <div id="quality-picker" class="popover-card" popover>
+      <p class="popover-title" data-i18n="quality.title">Qualidade da transmissão</p>
+      <button data-quality="high" data-i18n="quality.high">Alta (60fps)</button>
+      <button data-quality="standard" data-i18n="quality.standard">Padrão (30fps)</button>
+      <p class="popover-note" data-i18n="quality.note">Vale a partir da próxima vez que compartilhar a tela.</p>
+    </div>
+
+    <div id="theme-picker" class="popover-card" popover>
+      <p class="popover-title" data-i18n="theme.title">Tema</p>
+      <button data-theme-option="purple">
+        <span class="theme-swatch theme-swatch-graphite" aria-hidden="true"></span>
+        <span data-i18n="theme.purple">Grafite</span>
+      </button>
+      <button data-theme-option="white">
+        <span class="theme-swatch theme-swatch-white" aria-hidden="true"></span>
+        <span data-i18n="theme.white">Claro</span>
+      </button>
+      <button data-theme-option="black">
+        <span class="theme-swatch theme-swatch-black" aria-hidden="true"></span>
+        <span data-i18n="theme.black">Preto</span>
+      </button>
+    </div>
+  </header>
+
+  <aside id="participants-panel" class="bento-panel">
+    <div class="panel-header">
+      <h2>
+        <span data-i18n="panel.title">Participantes</span>
+        <span id="participants-count">0</span>
+      </h2>
+      <button id="participants-close" class="panel-close" aria-label="Fechar participantes" data-i18n-aria="aria.closeParticipants">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+      </button>
+    </div>
+    <ul id="participants-list"></ul>
+  </aside>
+
+  <main id="stage">
     <div id="stage-empty">
       <div class="stage-bubbles" id="stage-bubbles">
-        <div class="bubble purple"></div>
-        <div class="bubble pink"></div>
+        <div class="bubble iris"></div>
+        <div class="bubble cyan"></div>
         <div class="bubble-glow"></div>
       </div>
       <div class="stage-actions">
@@ -143,43 +178,12 @@
       <svg class="icon icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       <svg class="icon icon-compress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
     </button>
-  </div>
+  </main>
 
-  <div id="control-bar">
-    <button id="mic-btn" class="off" title="Mic" aria-label="Ligar/desligar microfone" data-i18n-title="mic.title" data-i18n-aria="mic.aria">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line class="off-slash" x1="3" y1="3" x2="21" y2="21"/></svg>
-    </button>
-    <button id="cam-btn" class="off" title="Câmera" aria-label="Ligar/desligar câmera" data-i18n-title="cam.title" data-i18n-aria="cam.aria">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/><line class="off-slash" x1="1" y1="2" x2="23" y2="22"/></svg>
-    </button>
-    <div class="control-divider" aria-hidden="true"></div>
-    <button id="screen-btn" class="btn-secondary" title="Compartilhar tela" aria-label="Compartilhar tela" data-i18n-title="action.shareScreen" data-i18n-aria="action.shareScreen">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-    </button>
-    <button id="cinema-btn" class="btn-secondary" title="Modo cinema (C)" aria-label="Modo cinema" data-i18n-title="cinema.title" data-i18n-aria="cinema.aria">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8l4-5h3l-3 5"/><path d="M9 8l4-5h3l-3 5"/><path d="M16 8l4-5h2v5"/><rect x="2" y="8" width="20" height="11" rx="2"/></svg>
-    </button>
-    <div class="control-divider" aria-hidden="true"></div>
-    <button id="leave-btn" class="btn-pill">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 17.72V20a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h2.28a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11z"/><line x1="22" y1="2" x2="2" y2="22"/></svg>
-      <span data-i18n="action.leave">Sair</span>
-    </button>
-  </div>
-
-  <aside id="participants-panel" class="side-panel" hidden>
-    <div class="side-panel-header">
-      <h2><span data-i18n="panel.title">Participantes</span> <span id="participants-count">0</span></h2>
-      <button id="participants-close" aria-label="Fechar participantes" data-i18n-aria="aria.closeParticipants">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
-      </button>
-    </div>
-    <ul id="participants-list"></ul>
-  </aside>
-
-  <aside id="chat-panel" class="side-panel" hidden>
-    <div class="side-panel-header">
+  <aside id="chat-panel" class="bento-panel">
+    <div class="panel-header">
       <h2><span data-i18n="chat.title">Chat</span></h2>
-      <button id="chat-close" aria-label="Fechar chat" data-i18n-aria="chat.close">
+      <button id="chat-close" class="panel-close" aria-label="Fechar chat" data-i18n-aria="chat.close">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
       </button>
     </div>
@@ -191,6 +195,28 @@
       </button>
     </form>
   </aside>
+
+  <div id="control-bar">
+    <button id="mic-btn" class="off" title="Mic" aria-label="Ligar/desligar microfone" data-i18n-title="mic.title" data-i18n-aria="mic.aria">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line class="off-slash" x1="3" y1="3" x2="21" y2="21"/></svg>
+    </button>
+    <button id="cam-btn" class="off" title="Câmera" aria-label="Ligar/desligar câmera" data-i18n-title="cam.title" data-i18n-aria="cam.aria">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/><line class="off-slash" x1="1" y1="2" x2="23" y2="22"/></svg>
+    </button>
+    <span class="control-divider" aria-hidden="true"></span>
+    <button id="screen-btn" title="Compartilhar tela" aria-label="Compartilhar tela" data-i18n-title="action.shareScreen" data-i18n-aria="action.shareScreen">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    </button>
+    <button id="cinema-btn" title="Modo cinema (C)" aria-label="Modo cinema" data-i18n-title="cinema.title" data-i18n-aria="cinema.aria">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8l4-5h3l-3 5"/><path d="M9 8l4-5h3l-3 5"/><path d="M16 8l4-5h2v5"/><rect x="2" y="8" width="20" height="11" rx="2"/></svg>
+    </button>
+    <span class="control-divider" aria-hidden="true"></span>
+    <button id="leave-btn" class="btn-pill">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 17.72V20a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h2.28a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11z"/><line x1="22" y1="2" x2="2" y2="22"/></svg>
+      <span data-i18n="action.leave">Sair</span>
+    </button>
+  </div>
+
 </div>
 
 <script type="module" src="/js/app.js"></script>

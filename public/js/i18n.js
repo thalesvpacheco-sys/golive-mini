@@ -53,8 +53,11 @@ const STRINGS = {
   'quality.note': { pt: 'Vale a partir da próxima vez que compartilhar a tela.', en: 'Applies the next time you share your screen.' },
 
   'theme.title': { pt: 'Tema', en: 'Theme' },
-  'theme.purple': { pt: 'Roxo', en: 'Purple' },
-  'theme.white': { pt: 'Branco', en: 'White' },
+  // a chave 'theme.purple' é histórica (o tema padrão já foi roxo) — hoje ele
+  // é o grafite. Mantida porque é a mesma chave salva no localStorage de quem
+  // já usou o app; só o rótulo mudou.
+  'theme.purple': { pt: 'Grafite', en: 'Graphite' },
+  'theme.white': { pt: 'Claro', en: 'Light' },
   'theme.black': { pt: 'Preto', en: 'Black' },
 
   'chat.title': { pt: 'Chat', en: 'Chat' },
