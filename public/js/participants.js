@@ -45,6 +45,9 @@ export function renderParticipantsList() {
 function setSpeaking(peerId, speaking) {
   const p = state.participants.get(peerId);
   if (!p) return;
+  // quem compartilha tela manda o som dela junto com a voz (ver
+  // screen-audio.js) — o medidor acusaria "falando" o filme inteiro.
+  if (p.sharingScreen) speaking = false;
   p.speaking = speaking;
   p.bubbleEl.classList.toggle('speaking', speaking);
   dom.participantsList?.querySelector(`li[data-peer-id="${peerId}"]`)?.classList.toggle('speaking', speaking);

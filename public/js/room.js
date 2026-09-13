@@ -7,6 +7,7 @@ import { t, translateServerMessage } from './i18n.js';
 import { appendChatMessage, clearChat } from './chat.js';
 import { isPanelOpen, resetPanels } from './panels.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './network-stats.js';
+import { musicFriendlySdp, sendScreenAudioTo, stopScreenAudio } from './screen-audio.js';
 import { closePopovers } from './popovers.js';
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
@@ -156,7 +157,8 @@ async function joinRoom() {
     ensureParticipant(newPeerId, { name });
     if (!isRejoin) showToast(t('toast.joined', { name }));
     const call = state.peer.call(newPeerId, state.localStream, {
-      metadata: { name: state.myName, cam: state.camEnabled, mic: state.micEnabled, sharingScreen: state.isScreenSharing }
+      metadata: { name: state.myName, cam: state.camEnabled, mic: state.micEnabled, sharingScreen: state.isScreenSharing },
+      sdpTransform: musicFriendlySdp,
     });
     registerCall(newPeerId, call);
   });
@@ -210,7 +212,7 @@ async function joinRoom() {
 
   // alguem me ligando -> eu atendo (recebo o estado dele via metadata)
   state.peer.on('call', (call) => {
-    call.answer(state.localStream);
+    call.answer(state.localStream, { sdpTransform: musicFriendlySdp });
     const meta = call.metadata || {};
     const p = ensureParticipant(call.peer, { name: meta.name });
     p.cam = !!meta.cam;
@@ -226,7 +228,10 @@ function registerCall(peerId, call) {
   // conexão nova nasce sem teto de bitrate; se já tem tela rolando, ela
   // precisa entrar no mesmo limite das outras — senão é justamente essa que
   // estoura o upload e derruba a qualidade de todo mundo.
-  if (state.isScreenSharing) applyBitrateCap();
+  if (state.isScreenSharing) {
+    applyBitrateCap();
+    sendScreenAudioTo(call);
+  }
   call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
   call.on('close', () => {
     // pode ser saida normal (user-left ja chegou/vai chegar) ou queda de conexao
@@ -242,6 +247,7 @@ function leaveRoom() {
   state.roomId = ''; // limpa ANTES de desconectar o socket, senão o handler
                       // de 'disconnect' acha que é uma queda de conexão de
                       // verdade e mostra "Reconectando..." numa saída normal.
+  stopScreenAudio(); // o som da aba não está no localStream, então não para junto com os tracks dele
   Object.values(state.calls).forEach(c => { try { c.close(); } catch (e) {} });
   state.calls = {};
   if (state.peer) { state.peer.destroy(); state.peer = null; }

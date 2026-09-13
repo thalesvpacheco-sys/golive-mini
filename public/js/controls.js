@@ -3,6 +3,8 @@
 import { dom, state } from './state.js';
 import { setSharingScreen, updateBubbleVisibility, renderParticipantsList, initialOf } from './participants.js';
 import { videoConstraints, bitrateFor, getQuality } from './quality.js';
+import { startScreenAudio, stopScreenAudio, trackSenderOf } from './screen-audio.js';
+import { t } from './i18n.js';
 
 export function toggleMic() {
   if (!state.localStream) return;
@@ -54,24 +56,37 @@ export async function toggleScreenShare() {
     // quality.js) — "ideal" é só uma sugestão pro navegador/hardware, ele
     // não trava se a máquina não aguentar 1080p/60fps, então é seguro pedir
     // o máximo por padrão.
-    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints() });
+    // audio: sem ele o navegador nem oferece capturar o som. Os três
+    // processamentos vêm desligados porque são filtros de VOZ — em música e
+    // filme cortam graves e "bombeiam" o volume. systemAudio:'include' deixa
+    // o Chrome oferecer o som da tela inteira no Windows, não só de aba.
+    screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: videoConstraints(),
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      systemAudio: 'include',
+    });
   } catch (e) { return; } // usuario cancelou o picker
 
   const newVideoTrack = screenStream.getVideoTracks()[0];
   const oldVideoTrack = state.localStream.getVideoTracks()[0];
 
   Object.values(state.calls).forEach((call) => {
-    const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-    if (sender) sender.replaceTrack(newVideoTrack);
+    trackSenderOf(call, 'video')?.replaceTrack(newVideoTrack).catch(() => {});
   });
 
-  state.localStream.removeTrack(oldVideoTrack);
-  oldVideoTrack.stop();
+  if (oldVideoTrack) {
+    state.localStream.removeTrack(oldVideoTrack);
+    oldVideoTrack.stop();
+  }
   state.localStream.addTrack(newVideoTrack);
   state.participants.get('local').videoEl.srcObject = state.localStream;
 
   state.isScreenSharing = true;
   applyBitrateCap();
+  // Sem track de áudio = a pessoa escolheu uma JANELA (o Chrome não captura
+  // som de janela) ou desmarcou a opção de áudio no seletor. Avisa em vez de
+  // deixar o outro lado achando que o som quebrou.
+  if (!startScreenAudio(screenStream)) showToast(t('share.noAudio'), { holdMs: 7000 });
   setSharingScreen('local', true);
   state.socket.emit('screen-share', { sharing: true });
   dom.camBtn.disabled = true;
@@ -91,10 +106,6 @@ export function applyQualityNow() {
   applyBitrateCap();
 }
 
-function videoSenderOf(call) {
-  return call.peerConnection?.getSenders().find((s) => s.track && s.track.kind === 'video');
-}
-
 // Teto de bitrate por conexão de saída. Sem isso o encoder do navegador não
 // tem limite e insiste no preset escolhido mesmo quando o upload não aguenta
 // — e em malha o upload é multiplicado por quantas pessoas estão na sala. O
@@ -104,7 +115,7 @@ export function applyBitrateCap() {
   const maxBitrate = bitrateFor(getQuality());
   if (!maxBitrate) return;
   Object.values(state.calls).forEach((call) => {
-    const sender = videoSenderOf(call);
+    const sender = trackSenderOf(call, 'video');
     if (!sender) return;
     const params = sender.getParameters();
     if (!params.encodings || !params.encodings.length) params.encodings = [{}];
@@ -118,7 +129,7 @@ export function applyBitrateCap() {
 // só limitaria qualidade à toa.
 export function clearBitrateCap() {
   Object.values(state.calls).forEach((call) => {
-    const sender = videoSenderOf(call);
+    const sender = trackSenderOf(call, 'video');
     if (!sender) return;
     const params = sender.getParameters();
     if (params.encodings?.[0]) delete params.encodings[0].maxBitrate;
@@ -128,26 +139,33 @@ export function clearBitrateCap() {
 
 export async function stopScreenShare() {
   if (!state.isScreenSharing) return;
-  let camStream;
+
+  // Sem câmera (negada ou ocupada por outro app) o compartilhamento termina
+  // mesmo assim, só que sem vídeo. Antes havia um `return` aqui: o navegador
+  // já tinha encerrado a tela, mas o app ficava preso em "compartilhando".
+  let newVideoTrack = null;
   try {
-    camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-  } catch (e) { return; }
+    const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    newVideoTrack = camStream.getVideoTracks()[0];
+    newVideoTrack.enabled = state.camEnabled;
+  } catch (e) {
+    console.warn('Câmera indisponível ao encerrar o compartilhamento.', e);
+  }
 
-  const newVideoTrack = camStream.getVideoTracks()[0];
-  newVideoTrack.enabled = state.camEnabled;
   const oldVideoTrack = state.localStream.getVideoTracks()[0];
-
   Object.values(state.calls).forEach((call) => {
-    const sender = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-    if (sender) sender.replaceTrack(newVideoTrack);
+    trackSenderOf(call, 'video')?.replaceTrack(newVideoTrack).catch(() => {});
   });
 
-  state.localStream.removeTrack(oldVideoTrack);
-  oldVideoTrack.stop();
-  state.localStream.addTrack(newVideoTrack);
+  if (oldVideoTrack) {
+    state.localStream.removeTrack(oldVideoTrack);
+    oldVideoTrack.stop();
+  }
+  if (newVideoTrack) state.localStream.addTrack(newVideoTrack);
   state.participants.get('local').videoEl.srcObject = state.localStream;
 
   state.isScreenSharing = false;
+  stopScreenAudio();
   clearBitrateCap();
   setSharingScreen('local', false);
   state.socket.emit('screen-share', { sharing: false });

@@ -22,6 +22,10 @@ const STRINGS = {
   'share.button': { pt: 'Compartilhar sala', en: 'Share room' },
   'share.copied': { pt: 'Link copiado!', en: 'Link copied!' },
   'share.manualCopy': { pt: 'Copia manual: {url}', en: 'Copy manually: {url}' },
+  'share.noAudio': {
+    pt: 'Tela compartilhada sem som. Pra ir com áudio, escolha uma ABA do Chrome e deixe marcado "Compartilhar áudio da aba".',
+    en: 'Screen shared without sound. To include audio, pick a Chrome TAB and keep "Share tab audio" checked.',
+  },
 
   'join.tagline': { pt: 'Compartilhem a tela e assistam juntos, mesmo longe.', en: 'Share your screen and watch together, even far apart.' },
   'join.nameLabel': { pt: 'Seu nome', en: 'Your name' },
