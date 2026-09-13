@@ -16,7 +16,11 @@ Sala de tela/câmera/áudio em grupo, sem cadastro, self-hosted.
         ├── state.js        # estado global + referências de DOM
         ├── room.js         # entrar/sair da sala, signaling, peer connections
         ├── participants.js # bolhas de câmera e palco central
-        ├── controls.js     # mic, câmera, tela, reações e toasts
+        ├── controls.js     # mic, câmera, reações e toasts
+        ├── screen-share.js # tela numa conexão própria + teto de bitrate + áudio estéreo
+        ├── user-menu.js    # botão direito numa pessoa: volume da voz e da transmissão
+        ├── volumes.js      # lembra o volume escolhido pra cada pessoa
+        ├── network-stats.js # RTT, perda e resolução real via getStats() + auto-degrade
         ├── panels.js       # estado dos painéis (coluna no desktop, gaveta no celular)
         ├── popovers.js     # escolha de qualidade e tema (abrir/fechar é nativo)
         ├── fullscreen.js   # move a UI pra dentro de #stage em tela cheia

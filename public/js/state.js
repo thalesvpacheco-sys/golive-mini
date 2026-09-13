@@ -26,6 +26,14 @@ export const dom = {
   qualityPicker: document.getElementById('quality-picker'),
   qualityStats: document.getElementById('quality-stats'),
   qualityDot: document.getElementById('quality-dot'),
+  userMenu: document.getElementById('user-menu'),
+  userMenuName: document.getElementById('user-menu-name'),
+  userMenuVoice: document.getElementById('user-menu-voice'),
+  userMenuVoiceValue: document.getElementById('user-menu-voice-value'),
+  userMenuStream: document.getElementById('user-menu-stream'),
+  userMenuStreamValue: document.getElementById('user-menu-stream-value'),
+  userMenuStreamRow: document.getElementById('user-menu-stream-row'),
+  userMenuMute: document.getElementById('user-menu-mute'),
   themeBtn: document.getElementById('theme-btn'),
   themePicker: document.getElementById('theme-picker'),
   participantsBtn: document.getElementById('participants-btn'),
@@ -47,6 +55,8 @@ export const state = {
   socket: null,
   peer: null,
   localStream: null,
+  screenStream: null, // tela que EU estou transmitindo (conexão própria, ver screen-share.js)
+  screenCalls: {}, // peerId -> MediaConnection da minha tela
   calls: {}, // peerId -> MediaConnection
   participants: new Map(), // peerId -> participant state
   leftPeers: new Set(), // peerIds que saíram de propósito (via 'user-left')

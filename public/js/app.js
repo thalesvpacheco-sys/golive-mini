@@ -2,7 +2,9 @@
 // Carregado como <script type="module"> no index.html.
 
 import { dom, state } from './state.js';
-import { toggleMic, toggleCamera, toggleScreenShare, toggleFullscreen, toggleCinemaMode, spawnPointerPing } from './controls.js';
+import { toggleMic, toggleCamera, toggleFullscreen, toggleCinemaMode, spawnPointerPing } from './controls.js';
+import { toggleScreenShare } from './screen-share.js';
+import { initUserMenu } from './user-menu.js';
 import { initRoom } from './room.js';
 import { ready as i18nReady } from './i18n.js';
 import { appendChatMessage } from './chat.js';
@@ -90,6 +92,7 @@ setInterval(() => {
 
 initPopovers();
 initShortcuts();
+initUserMenu();
 
 // espera a detecção de idioma (IP -> pt/en) antes de "abrir a loja" — assim
 // o status inicial, os textos do formulário de entrada etc já nascem no

@@ -221,6 +221,23 @@
     </button>
   </div>
 
+  <!-- menu de botão direito numa pessoa (estilo Discord) — ver user-menu.js.
+       Popover nativo: a posição vem do ponto do clique, via JS. -->
+  <div id="user-menu" class="popover-card user-menu" popover>
+    <p class="popover-title" id="user-menu-name"></p>
+    <label class="menu-slider">
+      <span data-i18n="menu.voice">Volume do usuário</span>
+      <span class="menu-value" id="user-menu-voice-value">100%</span>
+      <input type="range" id="user-menu-voice" min="0" max="100" step="1" />
+    </label>
+    <label class="menu-slider" id="user-menu-stream-row" hidden>
+      <span data-i18n="menu.stream">Volume da transmissão</span>
+      <span class="menu-value" id="user-menu-stream-value">100%</span>
+      <input type="range" id="user-menu-stream" min="0" max="100" step="1" />
+    </label>
+    <button id="user-menu-mute" type="button" data-i18n="menu.mute">Silenciar</button>
+  </div>
+
 </div>
 
 <script type="module" src="/js/app.js"></script>

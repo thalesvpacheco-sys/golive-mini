@@ -51,6 +51,12 @@ const STRINGS = {
 
   'panel.title': { pt: 'Participantes', en: 'Participants' },
 
+  'menu.voice': { pt: 'Volume do usuário', en: 'User volume' },
+  'menu.stream': { pt: 'Volume da transmissão', en: 'Stream volume' },
+  'menu.mute': { pt: 'Silenciar', en: 'Mute' },
+  'menu.unmute': { pt: 'Tirar do silêncio', en: 'Unmute' },
+  'menu.muted': { pt: 'Silenciado', en: 'Muted' },
+
   'quality.title': { pt: 'Qualidade da transmissão', en: 'Streaming quality' },
   'quality.high': { pt: 'Alta (60fps)', en: 'High (60fps)' },
   'quality.standard': { pt: 'Padrão (30fps)', en: 'Standard (30fps)' },

@@ -489,19 +489,16 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .participant-row .mic-state .off-slash, .participant-row .cam-state .off-slash { display: inline; }
 .participant-row .mic-state.on .off-slash, .participant-row .cam-state.on .off-slash { display: none; }
 
-/* volume por pessoa (estilo Discord) — cai numa segunda linha da própria
-   row, alinhado com o nome. */
-.volume-slider {
-  flex-basis: 100%;
-  margin-inline-start: calc(22px + var(--space-2));
-  width: calc(100% - 22px - var(--space-2));
-  height: 3px; accent-color: var(--accent); cursor: pointer;
-}
-/* painel estreito: o slider vira ruído antes de virar controle — some e
-   deixa a linha legível. Container query porque quem manda aqui é a
-   largura da COLUNA, não a da janela. */
+/* linhas de outras pessoas abrem o menu de volume (clique ou botão direito) */
+.participant-row[data-local="false"] { cursor: pointer; }
+.participant-row[data-local="false"]:hover { background: var(--overlay-1); }
+/* silenciada por você: some um pouco, igual o Discord faz */
+.participant-row.locally-muted .name { color: var(--faint); text-decoration: line-through; }
+.cam-bubble.locally-muted { opacity: .55; }
+
+/* painel estreito: aperta o respiro das linhas. Container query porque quem
+   manda aqui é a largura da COLUNA, não a da janela. */
 @container (max-width: 200px) {
-  .volume-slider { display: none; }
   .participant-row { padding: var(--space-1) var(--space-2); }
 }
 
@@ -823,6 +820,29 @@ body.cinema-mode #camera-bubbles { opacity: .7; }
 .quality-dot[hidden] { display: none; }
 .quality-dot.fair { background: var(--warn); }
 .quality-dot.poor { background: var(--danger); }
+
+/* ---------- menu de volume da pessoa ---------- */
+.user-menu { width: 250px; }
+.menu-slider {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: 6px var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  font-size: 12px; color: var(--muted);
+}
+.menu-slider[hidden] { display: none; }
+.menu-value {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* o `input` genérico lá em cima tem padding, borda e 44px de altura
+   (pensado pros campos de texto) — tudo isso quebraria um range. */
+.menu-slider input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%; min-height: 0; height: 18px; padding: 0; margin: 0;
+  border: none; background: transparent; accent-color: var(--accent); cursor: pointer;
+}
+#user-menu-mute { margin-top: 2px; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+#user-menu-mute.active { color: var(--danger); }
 
 .popover-note {
   margin: var(--space-1) 2px 2px; padding-inline: var(--space-2);

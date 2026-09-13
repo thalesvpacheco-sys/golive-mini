@@ -8,7 +8,7 @@
 import { dom } from './state.js';
 import { getQuality, setQuality } from './quality.js';
 import { getTheme, setTheme } from './theme.js';
-import { applyQualityNow } from './controls.js';
+import { applyQualityNow } from './screen-share.js';
 import { onNetworkSample } from './network-stats.js';
 import { t } from './i18n.js';
 

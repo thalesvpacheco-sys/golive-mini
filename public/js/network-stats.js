@@ -15,7 +15,8 @@
 
 import { state } from './state.js';
 import { getQuality, setQuality } from './quality.js';
-import { applyQualityNow, showToast } from './controls.js';
+import { showToast } from './controls.js';
+import { applyQualityNow } from './screen-share.js';
 import { t } from './i18n.js';
 
 const SAMPLE_MS = 2500;
@@ -85,7 +86,9 @@ async function sample() {
 }
 
 async function collect() {
-  const calls = Object.values(state.calls);
+  // conexões de tela por último: se estou transmitindo, a resolução que
+  // interessa mostrar é a da tela, não a da câmera
+  const calls = [...Object.values(state.calls), ...Object.values(state.screenCalls)];
   if (!calls.length) {
     Object.assign(latest, blank());
     notify();

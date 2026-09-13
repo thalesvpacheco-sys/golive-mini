@@ -4,6 +4,7 @@
 import { dom, state } from './state.js';
 import { startLevelMeter, stopLevelMeter, stopAllLevelMeters } from './audio-level.js';
 import { t } from './i18n.js';
+import { loadVolumes } from './volumes.js';
 
 // um SVG só por ícone (não um par on/off) — o traço da barra some via CSS
 // quando o `<span>` pai tem a classe "on" (`.off-slash`, mesmo truque já
@@ -21,19 +22,14 @@ export function renderParticipantsList() {
   dom.participantsList.innerHTML = '';
   state.participants.forEach((p) => {
     const li = document.createElement('li');
-    li.className = 'participant-row' + (p.speaking ? ' speaking' : '');
+    li.className = 'participant-row' + (p.speaking ? ' speaking' : '') + (p.muted ? ' locally-muted' : '');
     li.dataset.peerId = p.peerId;
-    const volumeControl = p.isLocal ? '' : `
-      <input type="range" class="volume-slider" min="0" max="100"
-        value="${Math.round((p.volume ?? 1) * 100)}"
-        data-peer-id="${p.peerId}" aria-label="Volume — ${escapeHtml(p.name)}" title="Volume de ${escapeHtml(p.name)}" />
-    `;
+    li.dataset.local = p.isLocal ? 'true' : 'false';
     li.innerHTML = `
       <span class="avatar avatar-${p.color}">${escapeHtml(initialOf(p.name))}</span>
       <span class="name">${escapeHtml(p.name)}</span>
       <span class="mic-state ${p.mic ? 'on' : ''}">${MIC_ICON}</span>
       <span class="cam-state ${p.cam ? 'on' : ''}">${CAM_ICON}</span>
-      ${volumeControl}
     `;
     dom.participantsList.appendChild(li);
   });
@@ -45,9 +41,6 @@ export function renderParticipantsList() {
 function setSpeaking(peerId, speaking) {
   const p = state.participants.get(peerId);
   if (!p) return;
-  // quem compartilha tela manda o som dela junto com a voz (ver
-  // screen-audio.js) — o medidor acusaria "falando" o filme inteiro.
-  if (p.sharingScreen) speaking = false;
   p.speaking = speaking;
   p.bubbleEl.classList.toggle('speaking', speaking);
   dom.participantsList?.querySelector(`li[data-peer-id="${peerId}"]`)?.classList.toggle('speaking', speaking);
@@ -60,12 +53,17 @@ export function ensureParticipant(peerId, opts = {}) {
   // continuam distinguíveis inclusive pra quem tem daltonismo — diferente do
   // par roxo/rosa anterior, que era praticamente a mesma cor pra alguns tipos.
   const color = idx % 2 === 0 ? 'iris' : 'cyan';
-  const bubbleEl = buildBubble(peerId, color, opts.name || peerId.slice(0, 6));
+  const name = opts.name || peerId.slice(0, 6);
+  const bubbleEl = buildBubble(peerId, color, name);
   const p = {
-    peerId, color, name: opts.name || peerId.slice(0, 6),
+    peerId, color, name,
     cam: false, mic: false, sharingScreen: false, speaking: false,
     bubbleEl, videoEl: bubbleEl.querySelector('video'), lost: false,
-    isLocal: !!opts.isLocal, volume: 1, // volume por participante (1 = 100%, estilo Discord)
+    // a tela vem numa conexão própria (screen-share.js), então tem o próprio
+    // <video>: é ele que vai pro palco, enquanto a bolha segue com a câmera.
+    screenVideoEl: buildScreenVideo(peerId),
+    isLocal: !!opts.isLocal,
+    ...loadVolumes(name), // volume, streamVolume, muted — escolhidos no menu de botão direito
   };
   state.participants.set(peerId, p);
   dom.cameraBubbles.appendChild(bubbleEl);
@@ -79,6 +77,7 @@ function buildBubble(peerId, color, label) {
   const el = document.createElement('div');
   el.className = `cam-bubble bubble-${color}`;
   el.id = 'bubble-' + peerId;
+  el.dataset.peerId = peerId;
   el.hidden = true;
   el.innerHTML = `
     <video autoplay playsinline ${peerId === 'local' ? 'muted' : ''}></video>
@@ -88,29 +87,48 @@ function buildBubble(peerId, color, label) {
   return el;
 }
 
+function buildScreenVideo(peerId) {
+  const el = document.createElement('video');
+  el.autoplay = true;
+  el.playsInline = true;
+  el.muted = peerId === 'local'; // sua própria tela: você já ouve o som original
+  return el;
+}
+
 export function attachStream(peerId, stream) {
   const p = ensureParticipant(peerId);
   p.stream = stream;
   p.videoEl.srcObject = stream;
-  p.videoEl.volume = p.volume ?? 1;
+  applyVolumes(p);
   startLevelMeter(peerId, stream, (speaking) => setSpeaking(peerId, speaking));
 }
 
-// controle de volume por pessoa (estilo Discord) — um slider por linha no
-// painel de participantes. Delegação de evento no <ul> em vez de listener
-// por slider, porque a lista inteira é reconstruída (innerHTML) toda vez
-// que alguém entra/sai/muda mic-câmera — um listener direto no <input>
-// morreria junto com o elemento antigo a cada render.
-dom.participantsList?.addEventListener('input', (e) => {
-  if (!e.target.classList.contains('volume-slider')) return;
-  const p = state.participants.get(e.target.dataset.peerId);
+// stream null = a transmissão acabou
+export function attachScreenStream(peerId, stream) {
+  const p = state.participants.get(peerId);
   if (!p) return;
-  p.volume = Number(e.target.value) / 100;
-  if (p.videoEl) p.videoEl.volume = p.volume;
-});
+  p.screenVideoEl.srcObject = stream;
+  applyVolumes(p);
+  // o <video> da tela pode ainda não estar no DOM quando o stream chega (o
+  // aviso de "começou a compartilhar" vem por outro caminho), e autoplay não
+  // garante o play fora do documento.
+  if (stream) p.screenVideoEl.play().catch(() => {});
+}
 
+// Voz = <video> da câmera (leva o mic); transmissão = <video> da tela.
+// Por serem elementos separados, cada um tem o próprio volume.
+export function applyVolumes(p) {
+  if (p.isLocal) return;
+  p.videoEl.volume = p.volume;
+  p.videoEl.muted = p.muted;
+  p.screenVideoEl.volume = p.streamVolume;
+  p.bubbleEl.classList.toggle('locally-muted', p.muted);
+  dom.participantsList?.querySelector(`li[data-peer-id="${p.peerId}"]`)?.classList.toggle('locally-muted', p.muted);
+}
+
+// A câmera não some mais quando a pessoa compartilha: a tela tem o próprio
+// vídeo no palco, então dá pra ver os dois ao mesmo tempo.
 export function updateBubbleVisibility(p) {
-  if (p.sharingScreen) { p.bubbleEl.hidden = true; return; }
   p.bubbleEl.hidden = p.lost ? false : !p.cam;
 }
 
@@ -137,17 +155,14 @@ export function setSharingScreen(peerId, sharing) {
 
 function promoteToStage(p) {
   dom.stageMain.innerHTML = '';
-  dom.stageMain.appendChild(p.videoEl);
+  dom.stageMain.appendChild(p.screenVideoEl);
   if (p.lost) dom.stageMain.appendChild(buildLostOverlay());
   dom.stageMain.hidden = false;
-  p.bubbleEl.hidden = true;
   dom.fullscreenBtn.hidden = false;
 }
 
 function demoteFromStage(p) {
-  if (p.videoEl.parentElement === dom.stageMain) {
-    p.bubbleEl.prepend(p.videoEl);
-  }
+  if (p.screenVideoEl.parentElement === dom.stageMain) p.screenVideoEl.remove();
   if (state.activeSharerId === null) {
     dom.stageMain.hidden = true;
     dom.fullscreenBtn.hidden = true;
@@ -168,7 +183,7 @@ export function markConnectionLost(peerId) {
   const p = state.participants.get(peerId);
   if (!p) return;
   p.lost = true;
-  if (p.sharingScreen && p.videoEl.parentElement === dom.stageMain) {
+  if (p.sharingScreen && p.screenVideoEl.parentElement === dom.stageMain) {
     dom.stageMain.appendChild(buildLostOverlay());
   } else {
     p.bubbleEl.querySelector('.cam-bubble-status').hidden = false;
