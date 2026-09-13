@@ -86,7 +86,7 @@ async function joinRoom() {
 
   state.roomId = roomId;
   const typedName = dom.nameInput.value.trim();
-  state.myName = typedName.slice(0, 40) || 'Alguém';
+  state.myName = typedName.slice(0, 40) || t('participant.anonymous');
 
   localStorage.setItem('golive-last-room', state.roomId);
   if (typedName) localStorage.setItem('golive-last-name', typedName);
@@ -110,7 +110,7 @@ async function joinRoom() {
   state.localStream.getAudioTracks().forEach(t => t.enabled = false);
   state.localStream.getVideoTracks().forEach(t => t.enabled = false);
 
-  ensureParticipant('local', { name: `${state.myName} (você)`, isLocal: true });
+  ensureParticipant('local', { name: `${state.myName} (${t('participant.you')})`, isLocal: true });
   attachStream('local', state.localStream);
 
   const iceConfig = await fetchIceConfig();
@@ -125,7 +125,7 @@ async function joinRoom() {
 
   state.peer.on('error', (err) => {
     console.error('Peer error:', err);
-    dom.statusEl.textContent = `Erro de conexão: ${err.type || err.message}`;
+    dom.statusEl.textContent = t('status.error', { detail: err.type || err.message });
   });
 
   // A rede caiu um instante (wifi oscilando, celular trocando de rede etc):

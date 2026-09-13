@@ -14,8 +14,10 @@ const STRINGS = {
   'status.reconnecting': { pt: 'Reconectando...', en: 'Reconnecting...' },
   'status.lost': { pt: 'Conexão perdida — recarregue a página', en: 'Connection lost — reload the page' },
   'status.connected': { pt: 'Conectado (sala: {room})', en: 'Connected (room: {room})' },
+  'status.error': { pt: 'Erro de conexão: {detail}', en: 'Connection error: {detail}' },
   'status.connectionLost': { pt: 'Conexão perdida, tentando reconectar...', en: 'Connection lost, trying to reconnect...' },
 
+  'aria.callTimer': { pt: 'Duração da chamada', en: 'Call duration' },
   'aria.participants': { pt: 'Ver participantes', en: 'View participants' },
   'aria.closeParticipants': { pt: 'Fechar participantes', en: 'Close participants' },
 
@@ -49,6 +51,8 @@ const STRINGS = {
   'reaction.title': { pt: 'Reação', en: 'Reaction' },
   'reaction.aria': { pt: 'Abrir reações', en: 'Open reactions' },
 
+  'participant.you': { pt: 'você', en: 'you' },
+  'participant.anonymous': { pt: 'Alguém', en: 'Someone' },
   'panel.title': { pt: 'Participantes', en: 'Participants' },
 
   'menu.voice': { pt: 'Volume do usuário', en: 'User volume' },
