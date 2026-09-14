@@ -9,6 +9,7 @@ import { isPanelOpen, resetPanels } from './panels.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './network-stats.js';
 import { callWithScreen, receiveScreenCall, closeScreenCallsWith, resetScreenShare } from './screen-share.js';
 import { closeUserMenuFor } from './user-menu.js';
+import { createPlaceholderStream, releasePlaceholders } from './local-media.js';
 import { closePopovers } from './popovers.js';
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
@@ -91,24 +92,11 @@ async function joinRoom() {
   localStorage.setItem('golive-last-room', state.roomId);
   if (typedName) localStorage.setItem('golive-last-name', typedName);
 
-  dom.statusEl.textContent = t('status.requestingMedia');
-  try {
-    state.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  } catch (e) {
-    // sem isso aqui, negar a permissão da câmera/mic deixava a tela de
-    // "Pedindo acesso..." travada pra sempre, sem nenhum aviso — pior tipo
-    // de loading state, o que nunca termina e nunca explica por quê.
-    console.error('getUserMedia falhou:', e);
-    showToast(t('alert.mediaDenied'), { holdMs: 6000 }); // mensagem longa, precisa de mais tempo pra ler
-    state.roomId = '';
-    dom.statusEl.textContent = t('status.disconnected');
-    joinBtn.disabled = false;
-    joinBtn.textContent = t('join.button');
-    return;
-  }
-  // comeca desligado - o uso tipico e ter audio/video rolando em paralelo (Discord etc)
-  state.localStream.getAudioTracks().forEach(t => t.enabled = false);
-  state.localStream.getVideoTracks().forEach(t => t.enabled = false);
+  // Entra sem pedir câmera nem mic: o navegador só pergunta quando a pessoa
+  // ligar um deles (ver local-media.js). Criado aqui, antes de qualquer await,
+  // pra ainda contar como resposta ao clique — o AudioContext do silêncio
+  // precisa disso pra não nascer bloqueado.
+  state.localStream = createPlaceholderStream();
 
   ensureParticipant('local', { name: `${state.myName} (${t('participant.you')})`, isLocal: true });
   attachStream('local', state.localStream);
@@ -254,6 +242,7 @@ function leaveRoom() {
   state.calls = {};
   if (state.peer) { state.peer.destroy(); state.peer = null; }
   if (state.localStream) { state.localStream.getTracks().forEach(t => t.stop()); state.localStream = null; }
+  releasePlaceholders();
   stopAllLevelMeters();
   stopNetworkMonitor();
   state.socket.removeAllListeners('user-joined');

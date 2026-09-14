@@ -2,12 +2,45 @@
 // O compartilhamento de tela mora em screen-share.js.
 
 import { dom, state } from './state.js';
-import { updateBubbleVisibility, renderParticipantsList, initialOf } from './participants.js';
+import { updateBubbleVisibility, renderParticipantsList, initialOf, attachStream } from './participants.js';
+import { acquireDevice } from './local-media.js';
+import { t } from './i18n.js';
 
-export function toggleMic() {
-  if (!state.localStream) return;
+// A prévia local e o medidor de "falando" estavam presos na faixa vazia;
+// reatribuir o srcObject (passando por null) força o <video> a reler as faixas.
+function refreshLocalPreview() {
+  const local = state.participants.get('local');
+  if (!local) return;
+  local.videoEl.srcObject = null;
+  attachStream('local', state.localStream);
+}
+
+// Ligar pela primeira vez pede a permissão do navegador. Se for negada, o
+// botão continua desligado e um toast explica — a pessoa segue na sala.
+async function ensureDevice(kind, deniedKey) {
+  const { track, fresh } = await acquireDevice(kind);
+  if (!track) {
+    showToast(t(deniedKey), { holdMs: 6000 });
+    return false;
+  }
+  if (fresh) refreshLocalPreview();
+  return true;
+}
+
+// clique repetido enquanto o navegador ainda pergunta a permissão: sem essa
+// trava os dois cliques terminariam juntos e ligariam/desligariam na hora
+const busy = { mic: false, cam: false };
+
+export async function toggleMic() {
+  if (!state.localStream || busy.mic) return;
+  busy.mic = true;
+  try {
+    if (!state.micEnabled && !(await ensureDevice('audio', 'alert.micDenied'))) return;
+  } finally {
+    busy.mic = false;
+  }
   state.micEnabled = !state.micEnabled;
-  state.localStream.getAudioTracks().forEach(t => t.enabled = state.micEnabled);
+  state.localStream.getAudioTracks().forEach((track) => { track.enabled = state.micEnabled; });
   dom.micBtn.classList.toggle('off', !state.micEnabled);
   const local = state.participants.get('local');
   if (local) local.mic = state.micEnabled;
@@ -15,10 +48,17 @@ export function toggleMic() {
   state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
 }
 
-export function toggleCamera() {
-  if (!state.localStream) return; // a tela tem conexão própria, então a câmera funciona durante o compartilhamento
+export async function toggleCamera() {
+  // a tela tem conexão própria, então a câmera funciona durante o compartilhamento
+  if (!state.localStream || busy.cam) return;
+  busy.cam = true;
+  try {
+    if (!state.camEnabled && !(await ensureDevice('video', 'alert.camDenied'))) return;
+  } finally {
+    busy.cam = false;
+  }
   state.camEnabled = !state.camEnabled;
-  state.localStream.getVideoTracks().forEach(t => t.enabled = state.camEnabled);
+  state.localStream.getVideoTracks().forEach((track) => { track.enabled = state.camEnabled; });
   dom.camBtn.classList.toggle('off', !state.camEnabled);
   const local = state.participants.get('local');
   if (local) { local.cam = state.camEnabled; updateBubbleVisibility(local); }

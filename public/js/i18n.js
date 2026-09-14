@@ -10,7 +10,6 @@
 
 const STRINGS = {
   'status.disconnected': { pt: 'Não conectado', en: 'Not connected' },
-  'status.requestingMedia': { pt: 'Pedindo acesso à câmera/mic...', en: 'Requesting camera/mic access...' },
   'status.reconnecting': { pt: 'Reconectando...', en: 'Reconnecting...' },
   'status.lost': { pt: 'Conexão perdida — recarregue a página', en: 'Connection lost — reload the page' },
   'status.connected': { pt: 'Conectado (sala: {room})', en: 'Connected (room: {room})' },
@@ -90,7 +89,8 @@ const STRINGS = {
 
   'alert.noRoom': { pt: 'Digita um ID de sala, mano.', en: 'Type in a room ID first.' },
   'alert.invalidRoom': { pt: 'ID de sala inválido. Use só letras, números, "-" ou "_" (até 40 caracteres).', en: 'Invalid room ID. Use only letters, numbers, "-" or "_" (up to 40 characters).' },
-  'alert.mediaDenied': { pt: 'Não consegui acessar câmera/microfone. Verifica se você deu permissão pro navegador (ícone de cadeado na barra de endereço) e tenta de novo.', en: "Couldn't access your camera/microphone. Check that you granted permission in the browser (padlock icon in the address bar) and try again." },
+  'alert.micDenied': { pt: 'Não deu pra ligar o microfone. Libere a permissão no cadeado da barra de endereço e tente de novo — você continua na sala.', en: "Couldn't turn on your microphone. Allow it in the padlock icon in the address bar and try again — you're still in the room." },
+  'alert.camDenied': { pt: 'Não deu pra ligar a câmera. Libere a permissão no cadeado da barra de endereço e tente de novo — você continua na sala.', en: "Couldn't turn on your camera. Allow it in the padlock icon in the address bar and try again — you're still in the room." },
   'alert.joinErrorDefault': { pt: 'Não foi possível entrar na sala.', en: 'Could not join the room.' },
 };
 
