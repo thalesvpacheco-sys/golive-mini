@@ -13,6 +13,8 @@ import { initFullscreen } from './fullscreen.js';
 import { initPopovers } from './popovers.js';
 import { initShortcuts } from './shortcuts.js';
 import { initLayout, videoContentRect } from './layout.js';
+import { initPopout, togglePopout } from './popout.js';
+import { initViewSize } from './view-size.js';
 import { togglePanel, setPanel, isPanelOpen, resetPanels } from './panels.js';
 
 mountAnimatedGradientBackground(dom.joinSection);
@@ -50,12 +52,16 @@ initLayout({
     const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
     const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
     if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) return;
-    spawnPointerPing(xPercent, yPercent, state.myName);
-    state.socket.emit('pointer', { x: xPercent, y: yPercent });
+    const sharerId = tile.dataset.peerId;
+    spawnPointerPing(xPercent, yPercent, state.myName, sharerId);
+    state.socket.emit('pointer', { x: xPercent, y: yPercent, sharer: sharerId === 'local' ? state.peer?.id : sharerId });
   },
 });
 
 initFullscreen();
+initPopout();
+initViewSize();
+dom.popoutBtn.onclick = () => togglePopout();
 
 resetPanels();
 

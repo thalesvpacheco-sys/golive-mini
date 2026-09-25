@@ -640,8 +640,64 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .tile.is-focused video, .tile-screen video { object-fit: contain; }
 .tile.is-focused { cursor: default; }
 .tile-screen.is-focused { cursor: crosshair; } /* clique = apontador */
-/* sua própria câmera espelhada, como num espelho (e como no Discord) */
-.tile-cam[data-local="true"] video { transform: scaleX(-1); }
+/* sua própria câmera espelhada, como num espelho (e como no Discord) —
+   dá pra desligar no menu do botão direito */
+#tiles.mirror-self .tile-cam[data-local="true"] video { transform: scaleX(-1); }
+
+/* arrastando a mini janela, a divisa da faixa ou a quina: segue o ponteiro
+   sem a animação, que só atrasaria */
+.tile.dragging, #tiles.resizing .tile { transition: none; }
+
+/* mini janela (desencaixada): por cima dos outros, com sombra */
+.tile.is-floating {
+  z-index: 2; cursor: grab; touch-action: none;
+  box-shadow: var(--shadow-float), 0 0 0 1px oklch(100% 0 0 / .12);
+}
+.tile.is-floating.dragging { cursor: grabbing; }
+
+/* botão de desencaixar/encaixar: aparece com o mouse em cima do bloco */
+.tile-dock {
+  position: absolute; top: var(--space-1); inset-inline-end: var(--space-1);
+  width: 28px; height: 28px; min-height: 28px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); border: 1px solid oklch(100% 0 0 / .16);
+  background: oklch(0% 0 0 / .55); color: oklch(99% 0 0);
+  opacity: 0; transition: opacity .15s var(--ease);
+  z-index: 1;
+}
+.tile-dock .icon { width: 15px; height: 15px; }
+.tile:hover .tile-dock, .tile-dock:focus-visible { opacity: 1; }
+@media (hover: none) { .tile-dock { display: none; } } /* no toque: menu do toque longo */
+/* bloco pequeno demais pro botão */
+#stage[data-layout="focus"] .tile:not(.is-focused):not(.is-floating) .tile-dock { display: none; }
+
+/* quina de redimensionar: só na mini janela, no canto virado pro centro */
+.tile-resize { display: none; }
+.tile.is-floating .tile-resize {
+  display: block; position: absolute; width: 18px; height: 18px; z-index: 1;
+  touch-action: none;
+}
+.tile.is-floating[data-corner$="r"] .tile-resize { left: 0; cursor: nwse-resize; }
+.tile.is-floating[data-corner$="l"] .tile-resize { right: 0; cursor: nesw-resize; }
+.tile.is-floating[data-corner^="b"] .tile-resize { top: 0; }
+.tile.is-floating[data-corner^="t"] .tile-resize { bottom: 0; }
+.tile.is-floating[data-corner="tr"] .tile-resize,
+.tile.is-floating[data-corner="bl"] .tile-resize { cursor: nesw-resize; }
+.tile.is-floating[data-corner="tl"] .tile-resize,
+.tile.is-floating[data-corner="br"] .tile-resize { cursor: nwse-resize; }
+
+/* divisa entre o foco e a faixa: arrastar muda a altura da faixa */
+.strip-handle {
+  position: absolute; left: 0; top: 0; width: 100%;
+  cursor: row-resize; pointer-events: auto; touch-action: none;
+}
+.strip-handle[hidden] { display: none; }
+.strip-handle::after {
+  content: ''; position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  width: 40px; height: 3px; border-radius: 2px;
+  background: var(--border-lit); opacity: 0; transition: opacity .15s var(--ease);
+}
+.strip-handle:hover::after, #tiles.resizing .strip-handle::after { opacity: 1; }
 
 /* sem câmera: avatar no lugar do vídeo */
 .tile-cam[data-video="off"] video { visibility: hidden; }
@@ -713,9 +769,25 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 #layout-btn .icon-focus { display: none; }
 #layout-btn.is-grid .icon-grid { display: none; }
 #layout-btn.is-grid .icon-focus { display: block; }
+#follow-btn .icon, #novideo-btn .icon { pointer-events: none; }
+.stage-icon-btn.active:not(#novideo-btn):not(#strip-btn) { background: var(--accent); border-color: transparent; color: oklch(12% 0.01 265); }
+/* janela separada: não existe tela cheia lá dentro */
+#stage.is-popout #fullscreen-btn { display: none; }
 #fullscreen-btn .icon-compress { display: none; }
 #fullscreen-btn.is-fullscreen .icon-expand { display: none; }
 #fullscreen-btn.is-fullscreen .icon-compress { display: block; }
+
+/* ---------- palco na janela separada (popout.js) ---------- */
+.stage-placeholder {
+  grid-area: stage; display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3);
+  background: var(--surface-1); border: 1px dashed var(--border-lit); border-radius: var(--radius-lg);
+  color: var(--muted); font-size: 14px; text-align: center; padding: var(--space-4);
+}
+#app.stage-popped .stage-placeholder { display: flex; }
+/* dentro da janela separada o palco ocupa tudo */
+.popout-body { margin: 0; height: 100vh; overflow: hidden; background: var(--bg); }
+.popout-body #stage { position: fixed; inset: 0; border: none; border-radius: 0; }
 
 /* ---------- reações / apontador ---------- */
 #reactions-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -889,6 +961,11 @@ body.cinema-mode #stage { border-color: transparent; }
 }
 #user-menu-mute { margin-top: 2px; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 #user-menu-mute.active { color: var(--danger); }
+#user-menu-audio[hidden] { display: none; }
+.menu-actions { display: flex; flex-direction: column; border-top: 1px solid var(--border); margin-top: 2px; padding-top: 2px; }
+#user-menu-audio[hidden] + .menu-actions { border-top: none; margin-top: 0; }
+.menu-actions button[hidden] { display: none; }
+.menu-actions button.active::after { content: ' ✓'; color: var(--accent); }
 
 .popover-note {
   margin: var(--space-1) 2px 2px; padding-inline: var(--space-2);
@@ -991,9 +1068,9 @@ body.cinema-mode #stage { border-color: transparent; }
 
 /* "estilo Discord": em tela cheia os controles somem sozinhos depois de um
    tempo parado e voltam quando o mouse mexe (ver fullscreen.js). */
-#stage.is-fullscreen.controls-hidden .stage-toolbar,
-#stage.is-fullscreen.controls-hidden #control-bar { opacity: 0; pointer-events: none; }
-#stage.is-fullscreen.controls-hidden { cursor: none; }
+#stage.is-overlay.controls-hidden .stage-toolbar,
+#stage.is-overlay.controls-hidden #control-bar { opacity: 0; pointer-events: none; }
+#stage.is-overlay.controls-hidden { cursor: none; }
 
 /* ============================================================
    TELAS MENORES

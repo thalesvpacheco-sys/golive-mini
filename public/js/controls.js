@@ -3,7 +3,8 @@
 
 import { dom, state } from './state.js';
 import { updateTile, renderParticipantsList, initialOf, attachStream } from './participants.js';
-import { screenPointToStage } from './layout.js';
+import { screenPointToStage, requestLayout } from './layout.js';
+import { reapplyViewSizes } from './view-size.js';
 import { acquireDevice } from './local-media.js';
 import { t } from './i18n.js';
 
@@ -24,7 +25,10 @@ async function ensureDevice(kind, deniedKey) {
     showToast(t(deniedKey), { holdMs: 6000 });
     return false;
   }
-  if (fresh) refreshLocalPreview();
+  if (fresh) {
+    refreshLocalPreview();
+    reapplyViewSizes(); // a escala de cada conexão depende da altura da câmera real
+  }
   return true;
 }
 
@@ -82,6 +86,7 @@ export function toggleFullscreen() {
 export function toggleCinemaMode(force) {
   state.cinemaMode = typeof force === 'boolean' ? force : !state.cinemaMode;
   document.body.classList.toggle('cinema-mode', state.cinemaMode);
+  requestLayout(); // no modo cinema a faixa de membros some
   dom.cinemaBtn?.classList.toggle('active', state.cinemaMode);
 }
 
@@ -113,8 +118,8 @@ function escapeForAttr(str) {
 // z-index e o "pointer-events: none" certos de graça.
 // x/y chegam em % da tela compartilhada e são convertidos pra % do palco,
 // porque a transmissão pode estar na faixa, com faixas pretas etc.
-export function spawnPointerPing(xPercent, yPercent, name) {
-  const pos = screenPointToStage(xPercent, yPercent);
+export function spawnPointerPing(xPercent, yPercent, name, sharerId) {
+  const pos = screenPointToStage(xPercent, yPercent, sharerId);
   if (!pos) return; // transmissão escondida: não tem onde apontar
   const el = document.createElement('span');
   el.className = 'pointer-ping';

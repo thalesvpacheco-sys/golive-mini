@@ -25,17 +25,11 @@ export function initFullscreen() {
   dom.toastLayer.after(toastLayerAnchor);
   const leaveBtn = document.getElementById('leave-btn');
 
-  let hideControlsTimer = null;
-  function showStageControls() {
-    dom.stage.classList.remove('controls-hidden');
-    clearTimeout(hideControlsTimer);
-    hideControlsTimer = setTimeout(() => dom.stage.classList.add('controls-hidden'), 2200);
-  }
-
   document.addEventListener('fullscreenchange', () => {
     const isFullscreen = document.fullscreenElement === dom.stage;
     dom.fullscreenBtn.classList.toggle('is-fullscreen', isFullscreen);
     dom.stage.classList.toggle('is-fullscreen', isFullscreen);
+    dom.stage.classList.toggle('is-overlay', isFullscreen || dom.stage.classList.contains('is-popout'));
     if (isFullscreen) {
       dom.controlBar.insertBefore(dom.participantsBtn, leaveBtn);
       dom.controlBar.insertBefore(dom.chatBtn, leaveBtn);
@@ -56,9 +50,17 @@ export function initFullscreen() {
     }
   });
 
-  // estilo Discord: em tela cheia, os controles continuam acessíveis por
-  // cima do vídeo, só ficam escondidos até o mouse se mexer.
+  // estilo Discord: em tela cheia (e na janela separada), os controles
+  // continuam acessíveis por cima do vídeo, só ficam escondidos até o mouse
+  // se mexer.
   dom.stage.addEventListener('mousemove', () => {
-    if (dom.stage.classList.contains('is-fullscreen')) showStageControls();
+    if (dom.stage.classList.contains('is-overlay')) showStageControls();
   });
+}
+
+let hideControlsTimer = null;
+export function showStageControls() {
+  dom.stage.classList.remove('controls-hidden');
+  clearTimeout(hideControlsTimer);
+  hideControlsTimer = setTimeout(() => dom.stage.classList.add('controls-hidden'), 2200);
 }

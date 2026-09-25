@@ -3,7 +3,7 @@
 // ONDE cada bloco aparece e em que tamanho é decidido em layout.js.
 
 import { dom, state } from './state.js';
-import { requestLayout, resetView, tileKey } from './layout.js';
+import { requestLayout, resetView, tileKey, onSpeaking } from './layout.js';
 import { startLevelMeter, stopLevelMeter, stopAllLevelMeters } from './audio-level.js';
 import { t } from './i18n.js';
 import { loadVolumes } from './volumes.js';
@@ -14,6 +14,10 @@ import { loadVolumes } from './volumes.js';
 // manter duas cópias quase idênticas de cada ícone.
 const MIC_ICON =
   '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line class="off-slash" x1="3" y1="3" x2="21" y2="21"/></svg>';
+// desencaixar (vira mini janela) / encaixar de volta — botão que aparece no hover
+const DOCK_BUTTON = () =>
+  `<button type="button" class="tile-dock" title="${t('tile.float')}" aria-label="${t('tile.float')}"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1"/></svg></button>
+  <span class="tile-resize" aria-hidden="true"></span>`;
 const CAM_ICON =
   '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8l4.5-2.5a1 1 0 0 1 1.5.9v11.2a1 1 0 0 1-1.5.9L15 16"/><rect x="2" y="6" width="13" height="12" rx="2"/><line class="off-slash" x1="1" y1="2" x2="23" y2="22"/></svg>';
 
@@ -45,6 +49,7 @@ function setSpeaking(peerId, speaking) {
   if (!p) return;
   p.speaking = speaking;
   p.tileEl.classList.toggle('speaking', speaking);
+  onSpeaking(peerId, speaking);
   dom.participantsList?.querySelector(`li[data-peer-id="${peerId}"]`)?.classList.toggle('speaking', speaking);
 }
 
@@ -94,6 +99,7 @@ function buildCamTile(peerId, color, name) {
       <span class="tile-name">${escapeHtml(name)}</span>
     </div>
     <span class="tile-status" hidden>${t('status.connectionLost')}</span>
+    ${DOCK_BUTTON()}
   `;
   return el;
 }
@@ -111,6 +117,7 @@ function buildScreenTile(peerId, name, video) {
       <span class="tile-name">${escapeHtml(name)}</span>
     </div>
     <span class="tile-status" hidden>${t('status.connectionLost')}</span>
+    ${DOCK_BUTTON()}
   `;
   el.prepend(video);
   return el;
@@ -158,7 +165,8 @@ export function applyVolumes(p) {
 // Estado visual do bloco da câmera (vídeo ou avatar, mic cortado, queda de
 // conexão). Se o bloco aparece ou some é o layout que decide.
 export function updateTile(p) {
-  p.tileEl.dataset.video = p.cam && !p.lost ? 'on' : 'off';
+  // videoHidden = você escolheu não ver o vídeo dessa pessoa (menu do botão direito)
+  p.tileEl.dataset.video = p.cam && !p.lost && !p.videoHidden ? 'on' : 'off';
   p.tileEl.classList.toggle('mic-off', !p.mic);
   p.tileEl.querySelector('.tile-status').hidden = !p.lost;
   p.screenTileEl.querySelector('.tile-status').hidden = !p.lost;
@@ -170,18 +178,19 @@ export function setSharingScreen(peerId, sharing) {
   if (!p) return;
   p.sharingScreen = sharing;
 
+  // Várias pessoas podem transmitir ao mesmo tempo (cada uma vira um bloco);
+  // a mais recente é a que ganha o foco automático.
   if (sharing) {
-    // só uma transmissão por vez; quem estava para de aparecer
-    if (state.activeSharerId && state.activeSharerId !== peerId) {
-      const prev = state.participants.get(state.activeSharerId);
-      if (prev) prev.sharingScreen = false;
-    }
     state.activeSharerId = peerId;
-    resetView(); // a transmissão nova ganha o foco sozinha
+    resetView();
   } else if (state.activeSharerId === peerId) {
-    state.activeSharerId = null;
+    state.activeSharerId = nextSharer();
   }
   requestLayout();
+}
+
+function nextSharer() {
+  return [...state.participants.values()].reverse().find((p) => p.sharingScreen)?.peerId ?? null;
 }
 
 export function markConnectionLost(peerId) {
@@ -194,12 +203,13 @@ export function markConnectionLost(peerId) {
 export function removeParticipant(peerId) {
   const p = state.participants.get(peerId);
   if (!p) return;
-  if (state.activeSharerId === peerId) state.activeSharerId = null;
   stopLevelMeter(peerId);
+  onSpeaking(peerId, false);
   p.tileEl.remove();
   p.screenTileEl.remove();
   state.participants.delete(peerId);
   delete state.calls[peerId];
+  if (state.activeSharerId === peerId) state.activeSharerId = nextSharer();
   maybeMergeBubbles();
   renderParticipantsList();
   requestLayout();
