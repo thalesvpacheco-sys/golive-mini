@@ -494,7 +494,6 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .participant-row[data-local="false"]:hover { background: var(--overlay-1); }
 /* silenciada por você: some um pouco, igual o Discord faz */
 .participant-row.locally-muted .name { color: var(--faint); text-decoration: line-through; }
-.cam-bubble.locally-muted { opacity: .55; }
 
 /* painel estreito: aperta o respiro das linhas. Container query porque quem
    manda aqui é a largura da COLUNA, não a da janela. */
@@ -606,58 +605,98 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   50% { translate: 0 -12px; }
 }
 
-#stage-main { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-#stage-main[hidden] { display: none; }
-#stage-main video { width: 100%; height: 100%; object-fit: contain; background: oklch(0% 0 0); }
-
-/* bolhas de câmera flutuando no canto do palco */
-#camera-bubbles {
-  position: absolute; inset-inline-end: var(--space-3); bottom: var(--space-3);
-  display: flex; gap: var(--space-2); align-items: flex-end;
-  pointer-events: none;
-  max-width: calc(100% - var(--space-3) * 2);
-  flex-wrap: wrap-reverse; justify-content: flex-end;
+/* ---------- blocos (câmera e tela) ----------
+   Todo bloco é absoluto dentro de #tiles; layout.js calcula posição e
+   tamanho (grade, foco + faixa) e só troca translate/width/height. A
+   transição daqui é que faz qualquer mudança de layout deslizar. */
+/* o container em si não pega clique: sem isso ele taparia os botões do
+   convite vazio que ficam embaixo dele */
+#tiles { position: absolute; inset: var(--space-2); pointer-events: none; }
+.tile {
+  position: absolute; left: 0; top: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-2);
+  cursor: pointer; pointer-events: auto;
+  transition: translate .32s var(--ease), width .32s var(--ease), height .32s var(--ease);
+  animation: tile-in .25s var(--ease);
 }
-.cam-bubble {
-  position: relative; width: 74px; height: 74px; border-radius: 50%;
-  overflow: hidden; background: oklch(0% 0 0);
-  border: 2px solid var(--border);
-  flex: none; pointer-events: auto;
+.tile.no-anim { transition: none; }
+.tile[hidden] { display: none; }
+@keyframes tile-in { from { opacity: 0; scale: .96; } }
+/* anel verde = "tá falando de verdade agora" (volume real do áudio, ver
+   audio-level.js). Por cima do vídeo, então precisa ser uma camada própria. */
+.tile::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: inset 0 0 0 1px oklch(100% 0 0 / .06);
+  pointer-events: none;
   transition: box-shadow .15s var(--ease);
 }
-.cam-bubble.bubble-iris { border-color: var(--accent); }
-.cam-bubble.bubble-cyan { border-color: var(--accent-2); }
-.cam-bubble[hidden] { display: none; }
-.cam-bubble video { width: 100%; height: 100%; object-fit: cover; }
-/* anel verde = "tá falando de verdade agora" (volume real do áudio, ver
-   audio-level.js). Estático, sem pulsar — pulsar cansa em filme longo. */
-.cam-bubble.speaking { box-shadow: 0 0 0 3px var(--online); }
-.cam-bubble-label {
-  position: absolute; inset-inline: 0; bottom: 0; text-align: center;
-  font-size: 9px; padding: 2px 0; background: oklch(0% 0 0 / .6);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.tile.speaking::after { box-shadow: inset 0 0 0 3px var(--online); }
+.tile.locally-muted video { opacity: .55; }
+
+.tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: oklch(0% 0 0); }
+/* em foco mostra a imagem inteira; tela compartilhada nunca é cortada */
+.tile.is-focused video, .tile-screen video { object-fit: contain; }
+.tile.is-focused { cursor: default; }
+.tile-screen.is-focused { cursor: crosshair; } /* clique = apontador */
+/* sua própria câmera espelhada, como num espelho (e como no Discord) */
+.tile-cam[data-local="true"] video { transform: scaleX(-1); }
+
+/* sem câmera: avatar no lugar do vídeo */
+.tile-cam[data-video="off"] video { visibility: hidden; }
+.tile-avatar { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+.tile-cam[data-video="off"] .tile-avatar { display: flex; }
+.tile-avatar .avatar {
+  width: clamp(36px, 28%, 96px); height: auto; aspect-ratio: 1; border-radius: 50%;
+  font-size: clamp(15px, 2.4vw, 38px);
 }
-/* nome só no hover — mas só onde hover existe de verdade; em touch ficaria
-   escondido pra sempre. */
-@media (hover: hover) {
-  .cam-bubble-label { opacity: 0; transition: opacity .15s var(--ease); }
-  .cam-bubble:hover .cam-bubble-label { opacity: 1; }
+.tile.speaking .tile-avatar .avatar { box-shadow: 0 0 0 3px var(--online); }
+
+.tile-footer {
+  position: absolute; inset-inline-start: var(--space-1); bottom: var(--space-1);
+  max-width: calc(100% - var(--space-2));
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px;
+  background: oklch(0% 0 0 / .55); color: oklch(99% 0 0);
+  font-size: 12px; line-height: 1.2;
+  pointer-events: none;
 }
-.cam-bubble-status {
+.tile-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-mic { display: none; color: var(--danger); }
+.tile-mic .icon { width: 13px; height: 13px; }
+.tile.mic-off .tile-mic { display: flex; }
+.tile-live {
+  flex: none; padding: 1px 5px; border-radius: 4px;
+  background: var(--danger); color: oklch(99% 0 0);
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+}
+.tile-status {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center; text-align: center;
-  font-size: 8px; padding: 4px; background: oklch(0% 0 0 / .75); line-height: 1.2;
+  font-size: 13px; padding: var(--space-2); background: oklch(0% 0 0 / .7); color: oklch(99% 0 0);
 }
-.cam-bubble-status[hidden] { display: none; }
+.tile-status[hidden] { display: none; }
 
-#stage-main .lost-overlay {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: oklch(0% 0 0 / .6); font-size: 14px; text-align: center; padding: var(--space-4);
+/* blocos pequenos (faixa, celular): rótulo mais discreto */
+#stage[data-layout="focus"] .tile:not(.is-focused) .tile-footer { font-size: 10px; padding: 2px 6px; }
+#stage[data-layout="focus"] .tile:not(.is-focused) .tile-live { font-size: 8px; }
+#stage[data-layout="focus"] .tile:not(.is-focused) .tile-status { font-size: 9px; }
+
+/* barra do palco: membros sem vídeo, faixa, grade/foco e tela cheia */
+.stage-toolbar {
+  position: absolute; top: var(--space-3); inset-inline-end: var(--space-3);
+  display: flex; gap: var(--space-1);
+  z-index: 3;
+  transition: opacity .2s var(--ease);
 }
-
-#fullscreen-btn {
-  position: absolute; top: var(--space-2); inset-inline-end: var(--space-2);
+.stage-toolbar[hidden] { display: none; }
+@media (hover: hover) {
+  /* só aparece com o mouse em cima do palco, igual ao Discord */
+  .stage-toolbar { opacity: 0; }
+  #stage:hover .stage-toolbar, .stage-toolbar:focus-within { opacity: 1; }
+}
+.stage-icon-btn {
   width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: var(--radius-sm);
   background: oklch(0% 0 0 / .55);
   border: 1px solid oklch(100% 0 0 / .16);
@@ -665,7 +704,15 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(8px);
 }
-#fullscreen-btn[hidden] { display: none; }
+.stage-icon-btn[hidden] { display: none; }
+.stage-icon-btn .off-slash { display: none; }
+.stage-icon-btn.active .off-slash { display: inline; }
+/* faixa escondida: a seta vira pra cima ("mostrar de volta") */
+#strip-btn .icon { transition: rotate .2s var(--ease); }
+#strip-btn.active .icon { rotate: 180deg; }
+#layout-btn .icon-focus { display: none; }
+#layout-btn.is-grid .icon-grid { display: none; }
+#layout-btn.is-grid .icon-focus { display: block; }
 #fullscreen-btn .icon-compress { display: none; }
 #fullscreen-btn.is-fullscreen .icon-expand { display: none; }
 #fullscreen-btn.is-fullscreen .icon-compress { display: block; }
@@ -767,7 +814,6 @@ body.cinema-mode #control-bar:hover,
 body.cinema-mode .bento-panel:hover { opacity: 1; }
 body.cinema-mode #app { background: oklch(0% 0 0); }
 body.cinema-mode #stage { border-color: transparent; }
-body.cinema-mode #camera-bubbles { opacity: .7; }
 
 /* ---------- popovers nativos ---------- */
 /* O atributo popover já dá top layer, Escape, clique-fora e fechar um
@@ -945,8 +991,7 @@ body.cinema-mode #camera-bubbles { opacity: .7; }
 
 /* "estilo Discord": em tela cheia os controles somem sozinhos depois de um
    tempo parado e voltam quando o mouse mexe (ver fullscreen.js). */
-#stage.is-fullscreen #fullscreen-btn { transition: opacity .25s var(--ease); }
-#stage.is-fullscreen.controls-hidden #fullscreen-btn,
+#stage.is-fullscreen.controls-hidden .stage-toolbar,
 #stage.is-fullscreen.controls-hidden #control-bar { opacity: 0; pointer-events: none; }
 #stage.is-fullscreen.controls-hidden { cursor: none; }
 
@@ -996,8 +1041,8 @@ body.cinema-mode #camera-bubbles { opacity: .7; }
   .bubble.cyan { inset-inline-start: 64px; }
   .bubble-glow { width: 70px; height: 70px; inset-inline-start: 44px; top: 20px; }
   .stage-actions button { padding: 11px 15px; font-size: 13px; }
-  #camera-bubbles { inset-inline-end: var(--space-2); bottom: var(--space-2); gap: var(--space-1); }
-  .cam-bubble { width: 56px; height: 56px; }
+  #tiles { inset: var(--space-1); }
+  .stage-toolbar { top: var(--space-2); inset-inline-end: var(--space-2); }
   #control-bar button { width: 42px; height: 42px; }
 }
 

@@ -2,8 +2,8 @@
 // transmissão e silenciar. Tudo LOCAL — muda só o que você ouve; a outra
 // pessoa não fica sabendo e não é afetada.
 //
-// Abre por botão direito na linha do painel, na bolha de câmera ou no palco
-// (quando é a tela de alguém). Na linha do painel abre também com clique
+// Abre por botão direito na linha do painel ou em qualquer bloco do palco
+// (câmera ou tela da pessoa). Na linha do painel abre também com clique
 // normal, porque no celular não existe botão direito.
 
 import { dom, state } from './state.js';
@@ -65,10 +65,9 @@ export function initUserMenu() {
 
   dom.participantsList.addEventListener('contextmenu', (e) => openFromEvent(rowId(e), e));
   dom.participantsList.addEventListener('click', (e) => openFromEvent(rowId(e), e));
-  dom.cameraBubbles.addEventListener('contextmenu', (e) => {
-    openFromEvent(e.target.closest('.cam-bubble')?.dataset.peerId, e);
+  dom.tiles.addEventListener('contextmenu', (e) => {
+    openFromEvent(e.target.closest('.tile')?.dataset.peerId, e);
   });
-  dom.stageMain.addEventListener('contextmenu', (e) => openFromEvent(state.activeSharerId, e));
 
   dom.userMenuVoice.addEventListener('input', () => update({ volume: dom.userMenuVoice.value / 100 }));
   dom.userMenuStream.addEventListener('input', () => update({ streamVolume: dom.userMenuStream.value / 100 }));

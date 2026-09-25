@@ -175,13 +175,25 @@
         </button>
       </div>
     </div>
-    <div id="stage-main" hidden></div>
-    <div id="camera-bubbles"></div>
+    <!-- blocos de câmera e de tela; posição e tamanho vêm de layout.js -->
+    <div id="tiles"></div>
     <div id="reactions-layer"></div>
-    <button id="fullscreen-btn" class="stage-icon-btn" title="Tela cheia" aria-label="Tela cheia" data-i18n-title="action.fullscreen" data-i18n-aria="action.fullscreen" hidden>
-      <svg class="icon icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-      <svg class="icon icon-compress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
-    </button>
+    <div id="stage-toolbar" class="stage-toolbar" hidden>
+      <button id="novideo-btn" class="stage-icon-btn" title="Mostrar/ocultar quem está sem vídeo" aria-label="Mostrar/ocultar quem está sem vídeo" data-i18n-title="stage.noVideo" data-i18n-aria="stage.noVideo">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><line class="off-slash" x1="3" y1="3" x2="21" y2="21"/></svg>
+      </button>
+      <button id="strip-btn" class="stage-icon-btn" title="Ocultar/mostrar membros (H)" aria-label="Ocultar/mostrar membros" data-i18n-title="stage.strip" data-i18n-aria="stage.stripAria" hidden>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <button id="layout-btn" class="stage-icon-btn" title="Grade / foco (G)" aria-label="Alternar grade e foco" data-i18n-title="stage.layout" data-i18n-aria="stage.layoutAria" hidden>
+        <svg class="icon icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+        <svg class="icon icon-focus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="12" rx="2"/><rect x="3" y="18" width="5" height="3" rx="1"/><rect x="9.5" y="18" width="5" height="3" rx="1"/><rect x="16" y="18" width="5" height="3" rx="1"/></svg>
+      </button>
+      <button id="fullscreen-btn" class="stage-icon-btn" title="Tela cheia" aria-label="Tela cheia" data-i18n-title="action.fullscreen" data-i18n-aria="action.fullscreen">
+        <svg class="icon icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        <svg class="icon icon-compress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+      </button>
+    </div>
   </main>
 
   <aside id="chat-panel" class="bento-panel">

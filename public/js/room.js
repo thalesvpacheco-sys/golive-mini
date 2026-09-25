@@ -1,7 +1,8 @@
 // Entrar/sair da sala, conexão com o signaling (Socket.io) e o mesh WebRTC (PeerJS).
 
 import { dom, state } from './state.js';
-import { ensureParticipant, attachStream, removeParticipant, markConnectionLost, setSharingScreen, updateBubbleVisibility, renderParticipantsList, stopAllLevelMeters } from './participants.js';
+import { ensureParticipant, attachStream, removeParticipant, markConnectionLost, setSharingScreen, updateTile, renderParticipantsList, stopAllLevelMeters } from './participants.js';
+import { resetLayout } from './layout.js';
 import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode } from './controls.js';
 import { t, translateServerMessage } from './i18n.js';
 import { appendChatMessage, clearChat } from './chat.js';
@@ -171,7 +172,7 @@ async function joinRoom() {
     const p = state.participants.get(fromId);
     if (!p) return;
     p.cam = cam; p.mic = mic;
-    updateBubbleVisibility(p);
+    updateTile(p);
     renderParticipantsList();
   });
 
@@ -214,7 +215,7 @@ async function joinRoom() {
     const p = ensureParticipant(call.peer, { name: meta.name });
     p.cam = !!meta.cam;
     p.mic = !!meta.mic;
-    updateBubbleVisibility(p);
+    updateTile(p);
     registerCall(call.peer, call);
     if (meta.sharingScreen) setSharingScreen(call.peer, true);
   });
@@ -254,7 +255,7 @@ function leaveRoom() {
   state.socket.removeAllListeners('chat-message');
   state.socket.disconnect();
 
-  state.participants.forEach(p => p.bubbleEl.remove());
+  state.participants.forEach(p => { p.tileEl.remove(); p.screenTileEl.remove(); });
   state.participants.clear();
   state.leftPeers.clear();
   state.nextColorIndex = 0;
@@ -264,12 +265,8 @@ function leaveRoom() {
   state.isScreenSharing = false;
   toggleCinemaMode(false); // não faz sentido sair da sala e a próxima ficar no escuro
 
-  dom.stageMain.hidden = true;
-  dom.stageMain.innerHTML = '';
-  dom.stageEmpty.hidden = false;
+  resetLayout(); // sem blocos, o palco volta pro convite vazio (e sai da tela cheia)
   dom.stageBubbles.classList.remove('merged');
-  dom.fullscreenBtn.hidden = true;
-  if (document.fullscreenElement === dom.stage) document.exitFullscreen?.();
   dom.micBtn.classList.add('off');
   dom.camBtn.classList.add('off'); dom.camBtn.disabled = false;
   closePopovers();

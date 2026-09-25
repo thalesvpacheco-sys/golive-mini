@@ -13,9 +13,12 @@ export const dom = {
   stage: document.getElementById('stage'),
   stageEmpty: document.getElementById('stage-empty'),
   stageBubbles: document.getElementById('stage-bubbles'),
-  stageMain: document.getElementById('stage-main'),
-  cameraBubbles: document.getElementById('camera-bubbles'),
+  tiles: document.getElementById('tiles'),
   reactionsLayer: document.getElementById('reactions-layer'),
+  stageToolbar: document.getElementById('stage-toolbar'),
+  layoutBtn: document.getElementById('layout-btn'),
+  stripBtn: document.getElementById('strip-btn'),
+  noVideoBtn: document.getElementById('novideo-btn'),
   fullscreenBtn: document.getElementById('fullscreen-btn'),
   controlBar: document.getElementById('control-bar'),
   micBtn: document.getElementById('mic-btn'),
@@ -61,7 +64,7 @@ export const state = {
   participants: new Map(), // peerId -> participant state
   leftPeers: new Set(), // peerIds que saíram de propósito (via 'user-left')
   nextColorIndex: 0,
-  activeSharerId: null, // peerId no palco grande (null = ninguém)
+  activeSharerId: null, // peerId de quem está transmitindo a tela (null = ninguém)
   micEnabled: false,
   camEnabled: false,
   isScreenSharing: false,

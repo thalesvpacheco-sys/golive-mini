@@ -1,7 +1,9 @@
-// Tudo que mexe em participantes: bolhas de câmera, palco central, e o
-// escape de HTML pro nome exibido (defesa básica contra XSS via `name`).
+// Tudo que mexe em participantes: os blocos de câmera e de tela do palco, e
+// o escape de HTML pro nome exibido (defesa básica contra XSS via `name`).
+// ONDE cada bloco aparece e em que tamanho é decidido em layout.js.
 
 import { dom, state } from './state.js';
+import { requestLayout, resetView, tileKey } from './layout.js';
 import { startLevelMeter, stopLevelMeter, stopAllLevelMeters } from './audio-level.js';
 import { t } from './i18n.js';
 import { loadVolumes } from './volumes.js';
@@ -36,13 +38,13 @@ export function renderParticipantsList() {
   if (dom.participantsCount) dom.participantsCount.textContent = state.participants.size;
 }
 
-// Liga o anel verde de "tá falando" na bolha de câmera e destaca a linha
+// Liga o anel verde de "tá falando" no bloco da câmera e destaca a linha
 // correspondente no painel de participantes, se ele estiver aberto.
 function setSpeaking(peerId, speaking) {
   const p = state.participants.get(peerId);
   if (!p) return;
   p.speaking = speaking;
-  p.bubbleEl.classList.toggle('speaking', speaking);
+  p.tileEl.classList.toggle('speaking', speaking);
   dom.participantsList?.querySelector(`li[data-peer-id="${peerId}"]`)?.classList.toggle('speaking', speaking);
 }
 
@@ -54,36 +56,63 @@ export function ensureParticipant(peerId, opts = {}) {
   // par roxo/rosa anterior, que era praticamente a mesma cor pra alguns tipos.
   const color = idx % 2 === 0 ? 'iris' : 'cyan';
   const name = opts.name || peerId.slice(0, 6);
-  const bubbleEl = buildBubble(peerId, color, name);
+  const tileEl = buildCamTile(peerId, color, name);
+  const screenVideoEl = buildScreenVideo(peerId);
   const p = {
     peerId, color, name,
     cam: false, mic: false, sharingScreen: false, speaking: false,
-    bubbleEl, videoEl: bubbleEl.querySelector('video'), lost: false,
+    tileEl, videoEl: tileEl.querySelector('video'), lost: false,
     // a tela vem numa conexão própria (screen-share.js), então tem o próprio
-    // <video>: é ele que vai pro palco, enquanto a bolha segue com a câmera.
-    screenVideoEl: buildScreenVideo(peerId),
+    // <video> num bloco só dela: dá pra ver a tela e a câmera ao mesmo tempo.
+    screenVideoEl,
+    screenTileEl: buildScreenTile(peerId, name, screenVideoEl),
     isLocal: !!opts.isLocal,
     ...loadVolumes(name), // volume, streamVolume, muted — escolhidos no menu de botão direito
   };
   state.participants.set(peerId, p);
-  dom.cameraBubbles.appendChild(bubbleEl);
-  updateBubbleVisibility(p);
+  dom.tiles.append(p.screenTileEl, tileEl);
+  updateTile(p);
   maybeMergeBubbles();
   renderParticipantsList();
   return p;
 }
 
-function buildBubble(peerId, color, label) {
+function buildCamTile(peerId, color, name) {
   const el = document.createElement('div');
-  el.className = `cam-bubble bubble-${color}`;
-  el.id = 'bubble-' + peerId;
+  el.className = 'tile tile-cam';
+  el.dataset.kind = 'cam';
+  el.dataset.key = tileKey('cam', peerId);
+  el.dataset.peerId = peerId;
+  el.dataset.local = peerId === 'local' ? 'true' : 'false';
+  el.hidden = true;
+  // sem câmera, o bloco mostra o avatar — igual ao Discord
+  el.innerHTML = `
+    <video autoplay playsinline ${peerId === 'local' ? 'muted' : ''}></video>
+    <div class="tile-avatar"><span class="avatar avatar-${color}">${escapeHtml(initialOf(name))}</span></div>
+    <div class="tile-footer">
+      <span class="tile-mic">${MIC_ICON}</span>
+      <span class="tile-name">${escapeHtml(name)}</span>
+    </div>
+    <span class="tile-status" hidden>${t('status.connectionLost')}</span>
+  `;
+  return el;
+}
+
+function buildScreenTile(peerId, name, video) {
+  const el = document.createElement('div');
+  el.className = 'tile tile-screen';
+  el.dataset.kind = 'screen';
+  el.dataset.key = tileKey('screen', peerId);
   el.dataset.peerId = peerId;
   el.hidden = true;
   el.innerHTML = `
-    <video autoplay playsinline ${peerId === 'local' ? 'muted' : ''}></video>
-    <span class="cam-bubble-label">${escapeHtml(label)}</span>
-    <span class="cam-bubble-status" hidden>${t('status.connectionLost')}</span>
+    <div class="tile-footer">
+      <span class="tile-live">${t('tile.live')}</span>
+      <span class="tile-name">${escapeHtml(name)}</span>
+    </div>
+    <span class="tile-status" hidden>${t('status.connectionLost')}</span>
   `;
+  el.prepend(video);
   return el;
 }
 
@@ -109,9 +138,9 @@ export function attachScreenStream(peerId, stream) {
   if (!p) return;
   p.screenVideoEl.srcObject = stream;
   applyVolumes(p);
-  // o <video> da tela pode ainda não estar no DOM quando o stream chega (o
+  // o bloco da tela pode ainda estar escondido quando o stream chega (o
   // aviso de "começou a compartilhar" vem por outro caminho), e autoplay não
-  // garante o play fora do documento.
+  // garante o play de um <video> que não está sendo desenhado.
   if (stream) p.screenVideoEl.play().catch(() => {});
 }
 
@@ -122,14 +151,18 @@ export function applyVolumes(p) {
   p.videoEl.volume = p.volume;
   p.videoEl.muted = p.muted;
   p.screenVideoEl.volume = p.streamVolume;
-  p.bubbleEl.classList.toggle('locally-muted', p.muted);
+  p.tileEl.classList.toggle('locally-muted', p.muted);
   dom.participantsList?.querySelector(`li[data-peer-id="${p.peerId}"]`)?.classList.toggle('locally-muted', p.muted);
 }
 
-// A câmera não some mais quando a pessoa compartilha: a tela tem o próprio
-// vídeo no palco, então dá pra ver os dois ao mesmo tempo.
-export function updateBubbleVisibility(p) {
-  p.bubbleEl.hidden = p.lost ? false : !p.cam;
+// Estado visual do bloco da câmera (vídeo ou avatar, mic cortado, queda de
+// conexão). Se o bloco aparece ou some é o layout que decide.
+export function updateTile(p) {
+  p.tileEl.dataset.video = p.cam && !p.lost ? 'on' : 'off';
+  p.tileEl.classList.toggle('mic-off', !p.mic);
+  p.tileEl.querySelector('.tile-status').hidden = !p.lost;
+  p.screenTileEl.querySelector('.tile-status').hidden = !p.lost;
+  requestLayout();
 }
 
 export function setSharingScreen(peerId, sharing) {
@@ -138,76 +171,38 @@ export function setSharingScreen(peerId, sharing) {
   p.sharingScreen = sharing;
 
   if (sharing) {
-    // so uma pessoa por vez ocupa o palco grande; quem estava sai
+    // só uma transmissão por vez; quem estava para de aparecer
     if (state.activeSharerId && state.activeSharerId !== peerId) {
       const prev = state.participants.get(state.activeSharerId);
-      if (prev) { prev.sharingScreen = false; demoteFromStage(prev); }
+      if (prev) prev.sharingScreen = false;
     }
     state.activeSharerId = peerId;
-    promoteToStage(p);
-  } else {
-    if (state.activeSharerId === peerId) state.activeSharerId = null;
-    demoteFromStage(p);
+    resetView(); // a transmissão nova ganha o foco sozinha
+  } else if (state.activeSharerId === peerId) {
+    state.activeSharerId = null;
   }
-
-  dom.stageEmpty.hidden = !!state.activeSharerId;
-}
-
-function promoteToStage(p) {
-  dom.stageMain.innerHTML = '';
-  dom.stageMain.appendChild(p.screenVideoEl);
-  if (p.lost) dom.stageMain.appendChild(buildLostOverlay());
-  dom.stageMain.hidden = false;
-  dom.fullscreenBtn.hidden = false;
-}
-
-function demoteFromStage(p) {
-  if (p.screenVideoEl.parentElement === dom.stageMain) p.screenVideoEl.remove();
-  if (state.activeSharerId === null) {
-    dom.stageMain.hidden = true;
-    dom.fullscreenBtn.hidden = true;
-    // nada mais pra ver em tela cheia se ninguém está compartilhando
-    if (document.fullscreenElement === dom.stage) document.exitFullscreen?.();
-  }
-  updateBubbleVisibility(p);
-}
-
-function buildLostOverlay() {
-  const el = document.createElement('div');
-  el.className = 'lost-overlay';
-  el.textContent = t('status.connectionLost');
-  return el;
+  requestLayout();
 }
 
 export function markConnectionLost(peerId) {
   const p = state.participants.get(peerId);
   if (!p) return;
   p.lost = true;
-  if (p.sharingScreen && p.screenVideoEl.parentElement === dom.stageMain) {
-    dom.stageMain.appendChild(buildLostOverlay());
-  } else {
-    p.bubbleEl.querySelector('.cam-bubble-status').hidden = false;
-    p.bubbleEl.hidden = false;
-  }
+  updateTile(p);
 }
 
 export function removeParticipant(peerId) {
   const p = state.participants.get(peerId);
   if (!p) return;
-  if (state.activeSharerId === peerId) {
-    state.activeSharerId = null;
-    dom.stageMain.hidden = true;
-    dom.stageMain.innerHTML = '';
-    dom.stageEmpty.hidden = false;
-    dom.fullscreenBtn.hidden = true;
-    if (document.fullscreenElement === dom.stage) document.exitFullscreen?.();
-  }
+  if (state.activeSharerId === peerId) state.activeSharerId = null;
   stopLevelMeter(peerId);
-  p.bubbleEl.remove();
+  p.tileEl.remove();
+  p.screenTileEl.remove();
   state.participants.delete(peerId);
   delete state.calls[peerId];
   maybeMergeBubbles();
   renderParticipantsList();
+  requestLayout();
 }
 
 export { stopAllLevelMeters };
@@ -218,7 +213,7 @@ export function maybeMergeBubbles() {
 }
 
 // primeira letra do nome, em maiúscula — usado no avatar do painel de
-// participantes e nas bolhas de reação (quem mandou o quê).
+// participantes, no bloco de quem está sem câmera e nas bolhas de reação (quem mandou o quê).
 export function initialOf(name) {
   return (name || '?').trim().charAt(0).toUpperCase() || '?';
 }
