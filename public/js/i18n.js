@@ -39,6 +39,12 @@ const STRINGS = {
   'action.shareScreen': { pt: 'Compartilhar tela', en: 'Share screen' },
   'action.enableCam': { pt: 'Ativar câmera', en: 'Turn on camera' },
   'action.fullscreen': { pt: 'Tela cheia', en: 'Fullscreen' },
+  'stage.layout': { pt: 'Grade / foco (G)', en: 'Grid / focus (G)' },
+  'stage.layoutAria': { pt: 'Alternar grade e foco', en: 'Toggle grid and focus' },
+  'stage.strip': { pt: 'Ocultar/mostrar membros (H)', en: 'Hide/show members (H)' },
+  'stage.stripAria': { pt: 'Ocultar/mostrar membros', en: 'Hide/show members' },
+  'stage.noVideo': { pt: 'Mostrar/ocultar quem está sem vídeo', en: 'Show/hide participants without video' },
+  'tile.live': { pt: 'AO VIVO', en: 'LIVE' },
   'action.leave': { pt: 'Sair', en: 'Leave' },
 
   'mic.title': { pt: 'Mic', en: 'Mic' },

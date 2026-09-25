@@ -2,7 +2,8 @@
 // O compartilhamento de tela mora em screen-share.js.
 
 import { dom, state } from './state.js';
-import { updateBubbleVisibility, renderParticipantsList, initialOf, attachStream } from './participants.js';
+import { updateTile, renderParticipantsList, initialOf, attachStream } from './participants.js';
+import { screenPointToStage } from './layout.js';
 import { acquireDevice } from './local-media.js';
 import { t } from './i18n.js';
 
@@ -43,7 +44,7 @@ export async function toggleMic() {
   state.localStream.getAudioTracks().forEach((track) => { track.enabled = state.micEnabled; });
   dom.micBtn.classList.toggle('off', !state.micEnabled);
   const local = state.participants.get('local');
-  if (local) local.mic = state.micEnabled;
+  if (local) { local.mic = state.micEnabled; updateTile(local); }
   renderParticipantsList();
   state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
 }
@@ -61,7 +62,7 @@ export async function toggleCamera() {
   state.localStream.getVideoTracks().forEach((track) => { track.enabled = state.camEnabled; });
   dom.camBtn.classList.toggle('off', !state.camEnabled);
   const local = state.participants.get('local');
-  if (local) { local.cam = state.camEnabled; updateBubbleVisibility(local); }
+  if (local) { local.cam = state.camEnabled; updateTile(local); }
   state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
 }
 
@@ -110,11 +111,15 @@ function escapeForAttr(str) {
 // pro outro lado, igual apontar numa videochamada de verdade. Reaproveita
 // a mesma reactions-layer (fica por cima do palco), então já ganha o
 // z-index e o "pointer-events: none" certos de graça.
+// x/y chegam em % da tela compartilhada e são convertidos pra % do palco,
+// porque a transmissão pode estar na faixa, com faixas pretas etc.
 export function spawnPointerPing(xPercent, yPercent, name) {
+  const pos = screenPointToStage(xPercent, yPercent);
+  if (!pos) return; // transmissão escondida: não tem onde apontar
   const el = document.createElement('span');
   el.className = 'pointer-ping';
-  el.style.left = `${xPercent}%`;
-  el.style.top = `${yPercent}%`;
+  el.style.left = `${pos.x}%`;
+  el.style.top = `${pos.y}%`;
   if (name) {
     const label = document.createElement('span');
     label.className = 'pointer-ping-label';

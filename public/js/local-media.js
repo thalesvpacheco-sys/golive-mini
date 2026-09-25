@@ -9,6 +9,13 @@
 
 import { state } from './state.js';
 
+// câmera em 16:9 e 720p: é o formato dos blocos do palco, e em foco ela
+// ocupa o palco inteiro — o padrão do navegador (640×480, 4:3) fica borrado.
+const CONSTRAINTS = {
+  audio: true,
+  video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 }, frameRate: { ideal: 30 } },
+};
+
 const placeholders = new Set();
 const pending = {}; // evita dois pedidos de permissão se clicar duas vezes
 let silenceCtx = null;
@@ -44,7 +51,7 @@ async function acquire(kind) {
 
   let track;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ [kind]: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ [kind]: CONSTRAINTS[kind] });
     track = kind === 'audio' ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
   } catch (e) {
     console.warn(`Sem acesso ao ${kind === 'audio' ? 'microfone' : 'câmera'}.`, e);

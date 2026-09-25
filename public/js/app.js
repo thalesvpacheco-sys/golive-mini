@@ -12,6 +12,7 @@ import { mountAnimatedGradientBackground } from './gradient-bg.js';
 import { initFullscreen } from './fullscreen.js';
 import { initPopovers } from './popovers.js';
 import { initShortcuts } from './shortcuts.js';
+import { initLayout, videoContentRect } from './layout.js';
 import { togglePanel, setPanel, isPanelOpen, resetPanels } from './panels.js';
 
 mountAnimatedGradientBackground(dom.joinSection);
@@ -40,17 +41,18 @@ dom.micBtn.onclick = () => toggleMic();
 dom.fullscreenBtn.onclick = () => toggleFullscreen();
 dom.cinemaBtn.onclick = () => toggleCinemaMode();
 
-// apontador ao vivo: clicar em cima do vídeo grande (a tela/câmera
-// compartilhada) manda um "ping" visual pro outro lado, na posição exata
-// do clique (em % da largura/altura, pra funcionar em qualquer resolução).
-// Não vale clique em botão nenhum — só no próprio vídeo.
-dom.stageMain.addEventListener('click', (e) => {
-  if (dom.stageMain.hidden) return;
-  const rect = dom.stageMain.getBoundingClientRect();
-  const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
-  const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
-  spawnPointerPing(xPercent, yPercent, state.myName);
-  state.socket.emit('pointer', { x: xPercent, y: yPercent });
+// apontador ao vivo: clicar na tela compartilhada em foco manda um "ping"
+// visual pro outro lado, na posição exata do clique — em % da IMAGEM (sem as
+// faixas pretas), pra cair no mesmo ponto em qualquer tamanho de janela.
+initLayout({
+  onScreenClick(e, tile) {
+    const rect = videoContentRect(tile.querySelector('video'));
+    const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
+    if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) return;
+    spawnPointerPing(xPercent, yPercent, state.myName);
+    state.socket.emit('pointer', { x: xPercent, y: yPercent });
+  },
 });
 
 initFullscreen();
