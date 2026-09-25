@@ -176,7 +176,7 @@
       </div>
     </div>
     <!-- blocos de câmera e de tela; posição e tamanho vêm de layout.js -->
-    <div id="tiles"></div>
+    <div id="tiles"><div id="strip-handle" class="strip-handle" hidden></div></div>
     <div id="reactions-layer"></div>
     <div id="stage-toolbar" class="stage-toolbar" hidden>
       <button id="novideo-btn" class="stage-icon-btn" title="Mostrar/ocultar quem está sem vídeo" aria-label="Mostrar/ocultar quem está sem vídeo" data-i18n-title="stage.noVideo" data-i18n-aria="stage.noVideo">
@@ -189,12 +189,24 @@
         <svg class="icon icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
         <svg class="icon icon-focus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="12" rx="2"/><rect x="3" y="18" width="5" height="3" rx="1"/><rect x="9.5" y="18" width="5" height="3" rx="1"/><rect x="16" y="18" width="5" height="3" rx="1"/></svg>
       </button>
+      <button id="follow-btn" class="stage-icon-btn" title="Seguir quem fala" aria-label="Seguir quem fala" data-i18n-title="stage.follow" data-i18n-aria="stage.follow">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+      </button>
+      <button id="popout-btn" class="stage-icon-btn" title="Abrir em janela (P)" aria-label="Abrir em janela" data-i18n-title="stage.popout" data-i18n-aria="stage.popoutAria">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3h7v7"/><line x1="21" y1="3" x2="11" y2="13"/><path d="M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>
+      </button>
       <button id="fullscreen-btn" class="stage-icon-btn" title="Tela cheia" aria-label="Tela cheia" data-i18n-title="action.fullscreen" data-i18n-aria="action.fullscreen">
         <svg class="icon icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         <svg class="icon icon-compress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
       </button>
     </div>
   </main>
+
+  <!-- no lugar do palco enquanto ele está na janela separada (popout.js) -->
+  <div id="stage-placeholder" class="stage-placeholder">
+    <p data-i18n="stage.poppedOut">O palco está numa janela separada.</p>
+    <button id="stage-dock-btn" class="btn-secondary" data-i18n="stage.dock">Trazer de volta</button>
+  </div>
 
   <aside id="chat-panel" class="bento-panel">
     <div class="panel-header">
@@ -237,6 +249,7 @@
        Popover nativo: a posição vem do ponto do clique, via JS. -->
   <div id="user-menu" class="popover-card user-menu" popover>
     <p class="popover-title" id="user-menu-name"></p>
+    <div id="user-menu-audio">
     <label class="menu-slider">
       <span data-i18n="menu.voice">Volume do usuário</span>
       <span class="menu-value" id="user-menu-voice-value">100%</span>
@@ -248,6 +261,17 @@
       <input type="range" id="user-menu-stream" min="0" max="100" step="1" />
     </label>
     <button id="user-menu-mute" type="button" data-i18n="menu.mute">Silenciar</button>
+    </div>
+    <!-- ações do palco; o texto de cada uma é preenchido por user-menu.js -->
+    <div class="menu-actions" id="user-menu-actions">
+      <button type="button" data-action="focus"></button>
+      <button type="button" data-action="float"></button>
+      <button type="button" data-action="popout"></button>
+      <button type="button" data-action="fullscreen"></button>
+      <button type="button" data-action="hide-video"></button>
+      <button type="button" data-action="mirror"></button>
+      <button type="button" data-action="hide-self"></button>
+    </div>
   </div>
 
 </div>

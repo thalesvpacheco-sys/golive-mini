@@ -51,6 +51,10 @@ app.get('/api/ice-config', (req, res) => {
 
 // quem esta em cada sala: { roomId: Set(peerId) }
 const rooms = {};
+// `${roomId}:${peerId}` -> socket.id, pra mandar recado pra UMA pessoa (view-size)
+const peerSockets = new Map();
+// alturas que o front pode pedir da câmera de alguém (0 = não está vendo)
+const VIEW_SIZES = new Set([0, 180, 360, 720]);
 
 function isValidRoomId(roomId) {
   return typeof roomId === 'string' && ROOM_ID_PATTERN.test(roomId);
@@ -91,6 +95,7 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('user-joined', { peerId, name: socket.data.name, isRejoin });
 
     rooms[roomId].add(peerId);
+    peerSockets.set(`${roomId}:${peerId}`, socket.id);
 
     io.to(roomId).emit('room-size', rooms[roomId].size);
   });
@@ -119,10 +124,20 @@ io.on('connection', (socket) => {
 
   // apontador ao vivo — só repassa a posição (0-100, em %) pra sala; sem
   // guardar nada nem validar demais, é só um ping visual passageiro.
-  socket.on('pointer', ({ x, y } = {}) => {
+  // `sharer` = de quem é a tela apontada (pode haver mais de uma transmissão)
+  socket.on('pointer', ({ x, y, sharer } = {}) => {
     const { roomId, peerId } = socket.data || {};
     if (!roomId || typeof x !== 'number' || typeof y !== 'number') return;
-    socket.to(roomId).emit('pointer', { peerId, x, y });
+    socket.to(roomId).emit('pointer', { peerId, x, y, sharer: typeof sharer === 'string' ? sharer.slice(0, 64) : undefined });
+  });
+
+  // "estou vendo sua câmera nesta altura" — vai só pra dona da câmera, que
+  // ajusta a resolução da conexão com quem pediu (ver public/js/view-size.js)
+  socket.on('view-size', ({ to, h } = {}) => {
+    const { roomId, peerId } = socket.data || {};
+    if (!roomId || typeof to !== 'string' || !VIEW_SIZES.has(h)) return;
+    const target = peerSockets.get(`${roomId}:${to}`);
+    if (target) io.to(target).emit('view-size', { peerId, h });
   });
 
   // chat de texto — sem histórico nenhum guardado no servidor (nem aqui,
@@ -142,6 +157,7 @@ io.on('connection', (socket) => {
     const { roomId, peerId } = socket.data || {};
     if (roomId && rooms[roomId]) {
       rooms[roomId].delete(peerId);
+      if (peerSockets.get(`${roomId}:${peerId}`) === socket.id) peerSockets.delete(`${roomId}:${peerId}`);
       socket.to(roomId).emit('user-left', peerId);
       io.to(roomId).emit('room-size', rooms[roomId].size);
       if (rooms[roomId].size === 0) delete rooms[roomId];

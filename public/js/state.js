@@ -19,6 +19,9 @@ export const dom = {
   layoutBtn: document.getElementById('layout-btn'),
   stripBtn: document.getElementById('strip-btn'),
   noVideoBtn: document.getElementById('novideo-btn'),
+  followBtn: document.getElementById('follow-btn'),
+  popoutBtn: document.getElementById('popout-btn'),
+  stripHandle: document.getElementById('strip-handle'),
   fullscreenBtn: document.getElementById('fullscreen-btn'),
   controlBar: document.getElementById('control-bar'),
   micBtn: document.getElementById('mic-btn'),
@@ -37,6 +40,8 @@ export const dom = {
   userMenuStreamValue: document.getElementById('user-menu-stream-value'),
   userMenuStreamRow: document.getElementById('user-menu-stream-row'),
   userMenuMute: document.getElementById('user-menu-mute'),
+  userMenuAudio: document.getElementById('user-menu-audio'),
+  userMenuActions: document.getElementById('user-menu-actions'),
   themeBtn: document.getElementById('theme-btn'),
   themePicker: document.getElementById('theme-picker'),
   participantsBtn: document.getElementById('participants-btn'),
@@ -64,7 +69,7 @@ export const state = {
   participants: new Map(), // peerId -> participant state
   leftPeers: new Set(), // peerIds que saíram de propósito (via 'user-left')
   nextColorIndex: 0,
-  activeSharerId: null, // peerId de quem está transmitindo a tela (null = ninguém)
+  activeSharerId: null, // transmissão mais recente, a que ganha o foco (null = ninguém)
   micEnabled: false,
   camEnabled: false,
   isScreenSharing: false,

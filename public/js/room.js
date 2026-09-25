@@ -12,6 +12,8 @@ import { callWithScreen, receiveScreenCall, closeScreenCallsWith, resetScreenSha
 import { closeUserMenuFor } from './user-menu.js';
 import { createPlaceholderStream, releasePlaceholders } from './local-media.js';
 import { closePopovers } from './popovers.js';
+import { joinViewSize, leaveViewSize, resendViewSizes, watchCall, forgetPeer } from './view-size.js';
+import { closePopout } from './popout.js';
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
 
@@ -70,6 +72,7 @@ function rejoinIfNeeded() {
   if (now - lastRejoinAt < 2000) return;
   lastRejoinAt = now;
   state.socket.emit('join-room', { roomId: state.roomId, peerId: state.peer.id, name: state.myName });
+  resendViewSizes(); // o servidor esqueceu quem estava vendo o quê
   setConnectionState('ok');
 }
 
@@ -160,6 +163,7 @@ async function joinRoom() {
     if (leaving) showToast(t('toast.left', { name: leaving.name }));
     closeScreenCallsWith(goneId);
     closeUserMenuFor(goneId);
+    forgetPeer(goneId);
     removeParticipant(goneId);
   });
 
@@ -183,9 +187,11 @@ async function joinRoom() {
 
   // apontador ao vivo do outro lado — a posição já vem em % (ver app.js),
   // então funciona igual dos dois lados independente do tamanho de tela.
-  state.socket.on('pointer', ({ peerId: fromId, x, y }) => {
+  state.socket.on('pointer', ({ peerId: fromId, x, y, sharer }) => {
     const sender = state.participants.get(fromId);
-    spawnPointerPing(x, y, sender?.name);
+    // `sharer` = de quem é a tela apontada (pode haver várias transmissões)
+    const sharerId = sharer === state.peer?.id ? 'local' : sharer;
+    spawnPointerPing(x, y, sender?.name, sharerId);
   });
 
   // mensagem de chat de outra pessoa (a minha própria já foi desenhada na
@@ -198,6 +204,8 @@ async function joinRoom() {
       dom.chatBadge.hidden = false;
     }
   });
+
+  joinViewSize();
 
   state.socket.on('join-error', ({ message }) => {
     showToast(message ? translateServerMessage(message) : t('alert.joinErrorDefault'));
@@ -223,6 +231,7 @@ async function joinRoom() {
 
 function registerCall(peerId, call) {
   state.calls[peerId] = call;
+  watchCall(peerId, call); // resolução da câmera conforme o tamanho em que a pessoa vê
   call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
   call.on('close', () => {
     // pode ser saida normal (user-left ja chegou/vai chegar) ou queda de conexao
@@ -235,6 +244,7 @@ function registerCall(peerId, call) {
 }
 
 function leaveRoom() {
+  closePopout(); // o palco volta pra página antes de tudo ser desmontado
   state.roomId = ''; // limpa ANTES de desconectar o socket, senão o handler
                       // de 'disconnect' acha que é uma queda de conexão de
                       // verdade e mostra "Reconectando..." numa saída normal.
@@ -253,6 +263,8 @@ function leaveRoom() {
   state.socket.removeAllListeners('reaction');
   state.socket.removeAllListeners('pointer');
   state.socket.removeAllListeners('chat-message');
+  state.socket.removeAllListeners('view-size');
+  leaveViewSize();
   state.socket.disconnect();
 
   state.participants.forEach(p => { p.tileEl.remove(); p.screenTileEl.remove(); });

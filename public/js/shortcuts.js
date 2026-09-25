@@ -1,17 +1,20 @@
-// Atalhos de teclado (M / F / C / G / H / Esc) — só valem DENTRO da sala, e nunca quando o foco está
+// Atalhos de teclado (M / F / C / G / H / P / 1–9 / Esc) — só valem DENTRO da sala, e nunca quando o foco está
 // num campo de texto (não faz sentido "M" mutar enquanto alguém digita uma
 // mensagem no chat).
 
 import { dom } from './state.js';
 import { toggleMic, toggleFullscreen, toggleCinemaMode } from './controls.js';
 import { isPanelOpen, setPanel } from './panels.js';
-import { toggleLayout, toggleStrip, exitFocus } from './layout.js';
+import { toggleLayout, toggleStrip, exitFocus, focusNth } from './layout.js';
+import { togglePopout } from './popout.js';
 
 export function initShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (!dom.appEl.classList.contains('active')) return;
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    // Ctrl+P, Ctrl+1 etc. são do navegador (imprimir, trocar de aba)
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (e.key === 'm' || e.key === 'M') {
       toggleMic();
@@ -23,6 +26,10 @@ export function initShortcuts() {
       toggleLayout();
     } else if (e.key === 'h' || e.key === 'H') {
       toggleStrip();
+    } else if (e.key === 'p' || e.key === 'P') {
+      togglePopout();
+    } else if (/^[1-9]$/.test(e.key)) {
+      focusNth(Number(e.key));
     } else if (e.key === 'Escape') {
       // os popovers de qualidade/tema fecham sozinhos no Escape (é
       // comportamento nativo do atributo popover), então aqui só sobram os
