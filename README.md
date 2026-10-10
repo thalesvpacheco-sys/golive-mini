@@ -10,7 +10,7 @@ Sala de tela/câmera/áudio em grupo, sem cadastro, self-hosted.
 ├── .env.example           # variáveis de ambiente (copie pra .env)
 ├── Dockerfile             # imagem do app
 ├── docker-compose.yml     # deploy na VPS: app + coturn (TURN) + Caddy (HTTPS)
-├── deploy/                # Caddyfile + passo a passo do deploy
+├── deploy/                # Caddyfile + passo a passo do deploy em VPS
 └── public/
     ├── index.html          # markup (regiões do bento)
     ├── css/style.css       # estilo, tokens OKLCH e o grid do bento
@@ -63,23 +63,53 @@ ex: `galera01`) e manda o mesmo link + ID pros amigos.
 
 ⚠️ **Importante:** `getDisplayMedia`/`getUserMedia` só funcionam em `https://`
 ou em `localhost`. Pra usar com amigos remotos, precisa hospedar com HTTPS
-(ver [Deploy](#deploy-vps)) — em HTTP puro
+(ver [Deploy](#deploy)) — em HTTP puro
 o navegador bloqueia a câmera/tela.
 
 ## Variáveis de ambiente
 
 Veja `.env.example` para a lista completa. As principais:
 
-- `PORT` — porta do servidor (no docker compose é fixada em 3000).
+- `PORT` — porta do servidor (o Render injeta a dele; no docker compose é 3000).
 - `MAX_ROOM_SIZE` — limite de pessoas por sala (padrão 8).
 - `DOMAIN` / `TURN_SECRET` / `TURN_EXTERNAL_IP` — deploy na VPS (ver abaixo).
 - `TURN_URLS` + `TURN_SECRET` (ou `TURN_USERNAME` / `TURN_CREDENTIAL`) — TURN,
   usado quando a conexão P2P direta falha (NAT simétrico, wifi corporativo).
   Sem isso, o app usa só STUN público — funciona na maioria dos casos.
 
-## Deploy (VPS)
+## Deploy
 
-Uma VPS roda tudo com `docker compose up -d --build`: o app, um TURN próprio
-(coturn, sem prazo de validade) e o Caddy com HTTPS automático. Passo a passo
-(Oracle Cloud grátis, subdomínio no Registro.br, portas) em
+### Produção atual: Render + ExpressTURN
+
+No ar em **https://toca.usagi.com.br**.
+
+- **App:** Render, plano Free, serviço `golive-mini`, branch `main`.
+  Build `npm install`, start `node server.js`. Todo push na `main`
+  redeploya sozinho.
+  - Depois de 15 min sem ninguém, o serviço dorme e o primeiro acesso leva
+    ~1 min pra acordar. Durante uma chamada ele não dorme (o Socket.io manda
+    sinal a cada 25s).
+- **TURN:** ExpressTURN, plano Free. No Render, em *Environment*:
+
+  | Variável | Valor |
+  |---|---|
+  | `TURN_URLS` | `turn:free.expressturn.com:3478,turn:free.expressturn.com:3478?transport=tcp` |
+  | `TURN_USERNAME` | usuário do painel do ExpressTURN |
+  | `TURN_CREDENTIAL` | senha do painel do ExpressTURN |
+
+  Clicar em *Refresh Credentials* no ExpressTURN troca a senha: aí é
+  preciso atualizar `TURN_CREDENTIAL` no Render. O plano grátis não tem
+  credencial temporária, então usuário/senha aparecem em `/api/ice-config`.
+- **Domínio:** no Registro.br (zona DNS de `usagi.com.br`), um `CNAME`
+  `toca` → `golive-mini.onrender.com`. No Render, o domínio está em
+  *Settings → Custom Domains*, e o HTTPS é automático.
+
+Pra conferir: `https://toca.usagi.com.br/api/ice-config` deve listar o
+servidor do ExpressTURN.
+
+### Alternativa: VPS própria
+
+Se um dia quiserem sair do Render: uma VPS roda tudo com
+`docker compose up -d --build` (o app, um TURN próprio com coturn e o Caddy
+com HTTPS automático). O passo a passo está em
 [`deploy/README.md`](deploy/README.md).

@@ -1,7 +1,7 @@
 // Entrar/sair da sala, conexão com o signaling (Socket.io) e o mesh WebRTC (PeerJS).
 
 import { dom, state } from './state.js';
-import { ensureParticipant, attachStream, removeParticipant, markConnectionLost, setSharingScreen, updateTile, renderParticipantsList, stopAllLevelMeters } from './participants.js';
+import { ensureParticipant, attachStream, removeParticipant, removeElements, markConnectionLost, setSharingScreen, updateTile, renderParticipantsList, stopAllLevelMeters } from './participants.js';
 import { resetLayout } from './layout.js';
 import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode } from './controls.js';
 import { t, translateServerMessage } from './i18n.js';
@@ -72,6 +72,9 @@ function rejoinIfNeeded() {
   if (now - lastRejoinAt < 2000) return;
   lastRejoinAt = now;
   state.socket.emit('join-room', { roomId: state.roomId, peerId: state.peer.id, name: state.myName });
+  // numa reconexão a sala pode ter perdido algum toggle de mic/câmera feito
+  // enquanto o socket estava caído — reenvia o estado atual
+  state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
   resendViewSizes(); // o servidor esqueceu quem estava vendo o quê
   setConnectionState('ok');
 }
@@ -230,10 +233,19 @@ async function joinRoom() {
 }
 
 function registerCall(peerId, call) {
+  // reconexão: a chamada nova substitui a antiga, que é fechada aqui
+  const previous = state.calls[peerId];
   state.calls[peerId] = call;
+  if (previous && previous !== call) { try { previous.close(); } catch (e) {} }
   watchCall(peerId, call); // resolução da câmera conforme o tamanho em que a pessoa vê
-  call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
+  call.on('stream', (remoteStream) => {
+    attachStream(peerId, remoteStream);
+    const p = state.participants.get(peerId);
+    if (p?.lost) { p.lost = false; updateTile(p); } // voltou depois de uma queda
+  });
   call.on('close', () => {
+    // a chamada antiga de uma reconexão fechando não é queda: já tem outra no lugar
+    if (state.calls[peerId] !== call) return;
     // pode ser saida normal (user-left ja chegou/vai chegar) ou queda de conexao
     setTimeout(() => {
       if (!state.participants.has(peerId)) return; // ja removido normalmente
@@ -267,7 +279,7 @@ function leaveRoom() {
   leaveViewSize();
   state.socket.disconnect();
 
-  state.participants.forEach(p => { p.tileEl.remove(); p.screenTileEl.remove(); });
+  state.participants.forEach(removeElements);
   state.participants.clear();
   state.leftPeers.clear();
   state.nextColorIndex = 0;

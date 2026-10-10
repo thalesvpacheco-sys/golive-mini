@@ -15,7 +15,7 @@ const MAX_NAME_LENGTH = 40;
 const MAX_ROOM_SIZE = Number(process.env.MAX_ROOM_SIZE) || 8;
 
 const app = express();
-// Atrás de um proxy (Caddy na VPS, ou o do Railway): sem isso o rate limit
+// Atrás de um proxy (o do Render, ou o Caddy na VPS): sem isso o rate limit
 // enxerga todo mundo com o IP do proxy e bloqueia a sala inteira junta.
 app.set('trust proxy', 1);
 const server = http.createServer(app);
@@ -182,7 +182,7 @@ server.listen(PORT, () => {
   console.log(`GoLive Mini rodando em http://localhost:${PORT}`);
 });
 
-// encerramento gracioso (Docker/Railway mandam SIGTERM em redeploy)
+// encerramento gracioso (Render/Docker mandam SIGTERM em redeploy)
 process.on('SIGTERM', () => {
   console.log('SIGTERM recebido, fechando servidor...');
   server.close(() => process.exit(0));

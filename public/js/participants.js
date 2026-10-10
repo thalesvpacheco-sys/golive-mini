@@ -72,6 +72,8 @@ export function ensureParticipant(peerId, opts = {}) {
     screenVideoEl,
     screenTileEl: buildScreenTile(peerId, name, screenVideoEl),
     isLocal: !!opts.isLocal,
+    // a voz toca num <audio> só dela, fora do palco (ver attachStream)
+    audioEl: opts.isLocal ? null : buildVoiceAudio(),
     ...loadVolumes(name), // volume, streamVolume, muted — escolhidos no menu de botão direito
   };
   state.participants.set(peerId, p);
@@ -92,7 +94,7 @@ function buildCamTile(peerId, color, name) {
   el.hidden = true;
   // sem câmera, o bloco mostra o avatar — igual ao Discord
   el.innerHTML = `
-    <video autoplay playsinline ${peerId === 'local' ? 'muted' : ''}></video>
+    <video autoplay playsinline muted></video>
     <div class="tile-avatar"><span class="avatar avatar-${color}">${escapeHtml(initialOf(name))}</span></div>
     <div class="tile-footer">
       <span class="tile-mic">${MIC_ICON}</span>
@@ -123,6 +125,26 @@ function buildScreenTile(peerId, name, video) {
   return el;
 }
 
+// Fora do palco de propósito: a janela separada (popout.js) move o palco de
+// documento, e mover um elemento de mídia pausa ele — a voz não pode cair junto.
+function buildVoiceAudio() {
+  const el = document.createElement('audio');
+  el.autoplay = true;
+  el.hidden = true;
+  document.body.appendChild(el);
+  return el;
+}
+
+// O navegador pode recusar tocar som antes de um clique na página (ex: aba
+// recarregada já dentro da sala). Tenta de novo no próximo clique/tecla.
+function playVoice(el) {
+  el.play().catch(() => {
+    const retry = () => el.play().catch(() => {});
+    document.addEventListener('pointerdown', retry, { once: true });
+    document.addEventListener('keydown', retry, { once: true });
+  });
+}
+
 function buildScreenVideo(peerId) {
   const el = document.createElement('video');
   el.autoplay = true;
@@ -131,10 +153,20 @@ function buildScreenVideo(peerId) {
   return el;
 }
 
+// Voz e câmera em elementos separados. Antes a voz tocava pelo próprio
+// <video> da câmera, e um <video> só começa a tocar depois do primeiro quadro
+// de vídeo: com a câmera desligada (faixa vazia ou envio pausado pelo
+// view-size.js) nenhum quadro chega, e o áudio ficava travado junto.
 export function attachStream(peerId, stream) {
   const p = ensureParticipant(peerId);
   p.stream = stream;
-  p.videoEl.srcObject = stream;
+  if (p.isLocal) {
+    p.videoEl.srcObject = stream;
+  } else {
+    p.videoEl.srcObject = new MediaStream(stream.getVideoTracks());
+    p.audioEl.srcObject = new MediaStream(stream.getAudioTracks());
+    playVoice(p.audioEl);
+  }
   applyVolumes(p);
   startLevelMeter(peerId, stream, (speaking) => setSpeaking(peerId, speaking));
 }
@@ -151,12 +183,12 @@ export function attachScreenStream(peerId, stream) {
   if (stream) p.screenVideoEl.play().catch(() => {});
 }
 
-// Voz = <video> da câmera (leva o mic); transmissão = <video> da tela.
+// Voz = <audio> da pessoa; transmissão = <video> da tela.
 // Por serem elementos separados, cada um tem o próprio volume.
 export function applyVolumes(p) {
   if (p.isLocal) return;
-  p.videoEl.volume = p.volume;
-  p.videoEl.muted = p.muted;
+  p.audioEl.volume = p.volume;
+  p.audioEl.muted = p.muted;
   p.screenVideoEl.volume = p.streamVolume;
   p.tileEl.classList.toggle('locally-muted', p.muted);
   dom.participantsList?.querySelector(`li[data-peer-id="${p.peerId}"]`)?.classList.toggle('locally-muted', p.muted);
@@ -205,14 +237,22 @@ export function removeParticipant(peerId) {
   if (!p) return;
   stopLevelMeter(peerId);
   onSpeaking(peerId, false);
-  p.tileEl.remove();
-  p.screenTileEl.remove();
+  removeElements(p);
   state.participants.delete(peerId);
   delete state.calls[peerId];
   if (state.activeSharerId === peerId) state.activeSharerId = nextSharer();
   maybeMergeBubbles();
   renderParticipantsList();
   requestLayout();
+}
+
+export function removeElements(p) {
+  p.tileEl.remove();
+  p.screenTileEl.remove();
+  if (p.audioEl) {
+    p.audioEl.srcObject = null;
+    p.audioEl.remove();
+  }
 }
 
 export { stopAllLevelMeters };
