@@ -6,13 +6,22 @@ const crypto = require('crypto');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { ExpressPeerServer } = require('peer');
+const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 const { Server } = require('socket.io');
 
 const PORT = process.env.PORT || 3000;
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
 const MAX_NAME_LENGTH = 40;
-const MAX_ROOM_SIZE = Number(process.env.MAX_ROOM_SIZE) || 8;
+const MAX_ROOM_SIZE = Number(process.env.MAX_ROOM_SIZE) || 30;
+
+const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
+if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+  console.warn('LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET faltando: ninguém consegue entrar numa sala.');
+}
+// a API REST do LiveKit usa https no mesmo host do wss
+const roomService = LIVEKIT_URL
+  ? new RoomServiceClient(LIVEKIT_URL.replace(/^ws/, 'http'), LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+  : null;
 
 const app = express();
 // Atrás de um proxy (o do Render, ou o Caddy na VPS): sem isso o rate limit
@@ -21,53 +30,12 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Cabeçalhos de segurança básicos (CSP desligada: o front carrega PeerJS/Socket.io
-// de CDN e usa inline <style>/<script type="module"> — travar isso pediria uma
-// reescrita maior do front que não vale a pena pra esse projeto agora).
+// Cabeçalhos de segurança básicos (CSP desligada: o front carrega o LiveKit e
+// o Socket.io de CDN e usa inline <style>/<script type="module"> — travar isso
+// pediria uma reescrita maior do front que não vale a pena agora).
 app.use(helmet({ contentSecurityPolicy: false }));
-
-// Limita quantas vezes um IP pode bater no signaling HTTP do PeerJS por minuto.
-// Não protege o WebSocket em si (Socket.io), mas cobre o handshake HTTP inicial.
-app.use('/peerjs', rateLimit({ windowMs: 60_000, max: 120 }));
-
+app.use(express.json({ limit: '2kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-
-// broker do WebRTC (troca as "cartas de endereco" dos peers)
-const peerServer = ExpressPeerServer(server, { path: '/' });
-app.use('/peerjs', peerServer);
-
-// Config de ICE (STUN/TURN) pro front montar o Peer(). Sem TURN configurado,
-// cai no STUN público padrão do PeerJS (funciona pra maioria das redes, mas
-// falha atrás de NAT simétrico / wifi corporativo — ver README).
-app.get('/api/ice-config', (req, res) => {
-  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
-
-  if (process.env.TURN_URLS) {
-    const urls = process.env.TURN_URLS.split(',').map((s) => s.trim());
-    if (process.env.TURN_SECRET) {
-      // coturn com use-auth-secret: credencial temporária (24h) assinada com o
-      // segredo compartilhado — a senha de verdade nunca chega no navegador.
-      const username = `${Math.floor(Date.now() / 1000) + 24 * 3600}:golive`;
-      const credential = crypto.createHmac('sha1', process.env.TURN_SECRET).update(username).digest('base64');
-      iceServers.push({ urls, username, credential });
-    } else {
-      iceServers.push({
-        urls,
-        username: process.env.TURN_USERNAME,
-        credential: process.env.TURN_CREDENTIAL,
-      });
-    }
-  }
-
-  res.json({ iceServers });
-});
-
-// quem esta em cada sala: { roomId: Set(peerId) }
-const rooms = {};
-// `${roomId}:${peerId}` -> socket.id, pra mandar recado pra UMA pessoa (view-size)
-const peerSockets = new Map();
-// alturas que o front pode pedir da câmera de alguém (0 = não está vendo)
-const VIEW_SIZES = new Set([0, 180, 360, 720]);
 
 function isValidRoomId(roomId) {
   return typeof roomId === 'string' && ROOM_ID_PATTERN.test(roomId);
@@ -78,53 +46,45 @@ function sanitizeName(name) {
   return name.trim().slice(0, MAX_NAME_LENGTH) || 'Alguém';
 }
 
+async function roomSize(roomId) {
+  try {
+    return (await roomService.listParticipants(roomId)).length;
+  } catch (e) {
+    return 0; // sala ainda não existe no LiveKit
+  }
+}
+
+// Áudio e vídeo vão pelo LiveKit (SFU): cada pessoa manda a câmera UMA vez
+// pro servidor deles, que distribui pra sala. Aqui só emitimos o token de
+// entrada — a identidade é sorteada no servidor pra ninguém se passar por outro.
+app.post('/api/livekit-token', rateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
+  const { roomId, name } = req.body || {};
+  if (!isValidRoomId(roomId)) return res.status(400).json({ message: 'Sala ou peerId inválido.' });
+  if (!roomService) return res.status(503).json({ message: 'Servidor de mídia não configurado.' });
+
+  if ((await roomSize(roomId)) >= MAX_ROOM_SIZE) {
+    return res.status(403).json({ message: `Sala cheia (máx. ${MAX_ROOM_SIZE} pessoas).` });
+  }
+
+  const identity = crypto.randomUUID();
+  const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    identity,
+    name: sanitizeName(name),
+    ttl: '6h',
+  });
+  token.addGrant({ room: roomId, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true });
+  res.json({ url: LIVEKIT_URL, token: await token.toJwt(), identity });
+});
+
+// Socket.io fica só com o que não é mídia: chat, reações e apontador.
+// Quem entra/sai e o estado de mic/câmera/tela vêm do próprio LiveKit.
 io.on('connection', (socket) => {
   socket.on('join-room', ({ roomId, peerId, name } = {}) => {
-    if (!isValidRoomId(roomId) || typeof peerId !== 'string' || !peerId) {
-      socket.emit('join-error', { message: 'Sala ou peerId inválido.' });
-      return;
-    }
-
-    const existing = rooms[roomId];
-    if (existing && existing.size >= MAX_ROOM_SIZE && !existing.has(peerId)) {
-      socket.emit('join-error', { message: `Sala cheia (máx. ${MAX_ROOM_SIZE} pessoas).` });
-      return;
-    }
-
+    if (!isValidRoomId(roomId) || typeof peerId !== 'string' || !peerId) return;
     socket.data.roomId = roomId;
-    socket.data.peerId = peerId;
+    socket.data.peerId = peerId.slice(0, 64);
     socket.data.name = sanitizeName(name);
     socket.join(roomId);
-
-    if (!rooms[roomId]) rooms[roomId] = new Set();
-
-    // isRejoin: esse peerId já estava na sala antes (é uma reconexão depois
-    // de uma queda, não gente nova de verdade) — o front usa isso pra não
-    // mostrar "Fulano entrou na sala" numa simples reconexão de rede.
-    const isRejoin = rooms[roomId].has(peerId);
-
-    // avisa a quem ja esta na sala que chegou gente nova
-    // (quem ja esta na sala que vai ligar pro novato -> monta o mesh sem duplicar chamada)
-    socket.to(roomId).emit('user-joined', { peerId, name: socket.data.name, isRejoin });
-
-    rooms[roomId].add(peerId);
-    peerSockets.set(`${roomId}:${peerId}`, socket.id);
-
-    io.to(roomId).emit('room-size', rooms[roomId].size);
-  });
-
-  // repassa mudanca de "estou compartilhando tela" pra sala (pra decidir o que vai pro palco)
-  socket.on('screen-share', ({ sharing } = {}) => {
-    const { roomId, peerId } = socket.data || {};
-    if (!roomId) return;
-    socket.to(roomId).emit('screen-share', { peerId, sharing: !!sharing });
-  });
-
-  // repassa toggle de mic/camera (pra sala saber se mostra a bolha do participante)
-  socket.on('media-state', ({ cam, mic } = {}) => {
-    const { roomId, peerId } = socket.data || {};
-    if (!roomId) return;
-    socket.to(roomId).emit('media-state', { peerId, cam: !!cam, mic: !!mic });
   });
 
   // reacao rapida (emoji flutuante) — limitada a um conjunto fixo pra evitar spam de texto arbitrário
@@ -144,15 +104,6 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('pointer', { peerId, x, y, sharer: typeof sharer === 'string' ? sharer.slice(0, 64) : undefined });
   });
 
-  // "estou vendo sua câmera nesta altura" — vai só pra dona da câmera, que
-  // ajusta a resolução da conexão com quem pediu (ver public/js/view-size.js)
-  socket.on('view-size', ({ to, h } = {}) => {
-    const { roomId, peerId } = socket.data || {};
-    if (!roomId || typeof to !== 'string' || !VIEW_SIZES.has(h)) return;
-    const target = peerSockets.get(`${roomId}:${to}`);
-    if (target) io.to(target).emit('view-size', { peerId, h });
-  });
-
   // chat de texto — sem histórico nenhum guardado no servidor (nem aqui,
   // nem em disco): só repassa pra sala, igual reaction/pointer. Quem manda
   // já desenha a própria mensagem na hora (ver app.js), então aqui só
@@ -164,17 +115,6 @@ io.on('connection', (socket) => {
     const trimmed = text.trim().slice(0, MAX_CHAT_LENGTH);
     if (!trimmed) return;
     socket.to(roomId).emit('chat-message', { peerId, name: socket.data.name, text: trimmed });
-  });
-
-  socket.on('disconnect', () => {
-    const { roomId, peerId } = socket.data || {};
-    if (roomId && rooms[roomId]) {
-      rooms[roomId].delete(peerId);
-      if (peerSockets.get(`${roomId}:${peerId}`) === socket.id) peerSockets.delete(`${roomId}:${peerId}`);
-      socket.to(roomId).emit('user-left', peerId);
-      io.to(roomId).emit('room-size', rooms[roomId].size);
-      if (rooms[roomId].size === 0) delete rooms[roomId];
-    }
   });
 });
 

@@ -40,7 +40,6 @@ let frame = 0;
 // requestAnimationFrame da aba de origem para quando ela fica escondida
 let win = window;
 const followTimers = new Map();
-const listeners = [];
 
 function loadPrefs() {
   try {
@@ -177,13 +176,6 @@ function layout() {
   dom.tiles.classList.toggle('mirror-self', prefs.mirrorSelf);
   if (mode === 'empty' && document.fullscreenElement === dom.stage) document.exitFullscreen?.();
 
-  listeners.forEach((fn) => fn());
-}
-
-// Avisado depois de cada layout — a qualidade adaptativa (view-size.js)
-// mede o tamanho novo de cada bloco daqui.
-export function onLayout(fn) {
-  listeners.push(fn);
 }
 
 function stripHeight(H) {

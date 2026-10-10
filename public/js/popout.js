@@ -29,7 +29,7 @@ export function closePopout() {
 }
 
 export async function openPopout() {
-  if (pipWin || !state.localStream) return;
+  if (pipWin || !state.room) return;
   if (!('documentPictureInPicture' in window)) {
     videoPipFallback();
     return;

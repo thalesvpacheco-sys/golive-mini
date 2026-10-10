@@ -2,72 +2,54 @@
 // O compartilhamento de tela mora em screen-share.js.
 
 import { dom, state } from './state.js';
-import { updateTile, renderParticipantsList, initialOf, attachStream } from './participants.js';
+import { updateTile, renderParticipantsList, initialOf } from './participants.js';
 import { screenPointToStage, requestLayout } from './layout.js';
-import { reapplyViewSizes } from './view-size.js';
-import { acquireDevice } from './local-media.js';
 import { t } from './i18n.js';
 
-// A prévia local e o medidor de "falando" estavam presos na faixa vazia;
-// reatribuir o srcObject (passando por null) força o <video> a reler as faixas.
-function refreshLocalPreview() {
-  const local = state.participants.get('local');
-  if (!local) return;
-  local.videoEl.srcObject = null;
-  attachStream('local', state.localStream);
-}
-
-// Ligar pela primeira vez pede a permissão do navegador. Se for negada, o
-// botão continua desligado e um toast explica — a pessoa segue na sala.
-async function ensureDevice(kind, deniedKey) {
-  const { track, fresh } = await acquireDevice(kind);
-  if (!track) {
-    showToast(t(deniedKey), { holdMs: 6000 });
-    return false;
-  }
-  if (fresh) {
-    refreshLocalPreview();
-    reapplyViewSizes(); // a escala de cada conexão depende da altura da câmera real
-  }
-  return true;
-}
+// Mic e câmera são independentes: ligar/desligar um nunca mexe no outro.
+// Ligar pela primeira vez pede a permissão do navegador (o LiveKit publica a
+// faixa nessa hora); depois disso, desligar só silencia/apaga a faixa.
+// Se a permissão for negada, o botão continua desligado e um toast explica.
 
 // clique repetido enquanto o navegador ainda pergunta a permissão: sem essa
 // trava os dois cliques terminariam juntos e ligariam/desligariam na hora
 const busy = { mic: false, cam: false };
 
-export async function toggleMic() {
-  if (!state.localStream || busy.mic) return;
-  busy.mic = true;
+async function setDevice(kind, enabled) {
+  const lp = state.room?.localParticipant;
+  if (!lp || busy[kind]) return false;
+  busy[kind] = true;
   try {
-    if (!state.micEnabled && !(await ensureDevice('audio', 'alert.micDenied'))) return;
+    if (kind === 'mic') await lp.setMicrophoneEnabled(enabled);
+    else await lp.setCameraEnabled(enabled);
+    return true;
+  } catch (e) {
+    console.warn(`Sem acesso ao ${kind === 'mic' ? 'microfone' : 'câmera'}.`, e);
+    if (enabled) showToast(t(kind === 'mic' ? 'alert.micDenied' : 'alert.camDenied'), { holdMs: 6000 });
+    return false;
   } finally {
-    busy.mic = false;
+    busy[kind] = false;
   }
-  state.micEnabled = !state.micEnabled;
-  state.localStream.getAudioTracks().forEach((track) => { track.enabled = state.micEnabled; });
-  dom.micBtn.classList.toggle('off', !state.micEnabled);
+}
+
+export async function toggleMic() {
+  const next = !state.micEnabled;
+  if (!(await setDevice('mic', next))) return;
+  state.micEnabled = next;
+  dom.micBtn.classList.toggle('off', !next);
   const local = state.participants.get('local');
-  if (local) { local.mic = state.micEnabled; updateTile(local); }
+  if (local) { local.mic = next; updateTile(local); }
   renderParticipantsList();
-  state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
 }
 
 export async function toggleCamera() {
-  // a tela tem conexão própria, então a câmera funciona durante o compartilhamento
-  if (!state.localStream || busy.cam) return;
-  busy.cam = true;
-  try {
-    if (!state.camEnabled && !(await ensureDevice('video', 'alert.camDenied'))) return;
-  } finally {
-    busy.cam = false;
-  }
-  state.camEnabled = !state.camEnabled;
-  state.localStream.getVideoTracks().forEach((track) => { track.enabled = state.camEnabled; });
-  dom.camBtn.classList.toggle('off', !state.camEnabled);
+  // a tela é outra faixa, então a câmera funciona durante o compartilhamento
+  const next = !state.camEnabled;
+  if (!(await setDevice('cam', next))) return;
+  state.camEnabled = next;
+  dom.camBtn.classList.toggle('off', !next);
   const local = state.participants.get('local');
-  if (local) { local.cam = state.camEnabled; updateTile(local); }
-  state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
+  if (local) { local.cam = next; updateTile(local); }
 }
 
 // tela cheia no palco (vídeo/tela compartilhada) — ESC já sai sozinho, é

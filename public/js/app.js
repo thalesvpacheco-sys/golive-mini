@@ -14,7 +14,6 @@ import { initPopovers } from './popovers.js';
 import { initShortcuts } from './shortcuts.js';
 import { initLayout, videoContentRect } from './layout.js';
 import { initPopout, togglePopout } from './popout.js';
-import { initViewSize } from './view-size.js';
 import { togglePanel, setPanel, isPanelOpen, resetPanels } from './panels.js';
 
 mountAnimatedGradientBackground(dom.joinSection);
@@ -54,13 +53,12 @@ initLayout({
     if (xPercent < 0 || xPercent > 100 || yPercent < 0 || yPercent > 100) return;
     const sharerId = tile.dataset.peerId;
     spawnPointerPing(xPercent, yPercent, state.myName, sharerId);
-    state.socket.emit('pointer', { x: xPercent, y: yPercent, sharer: sharerId === 'local' ? state.peer?.id : sharerId });
+    state.socket.emit('pointer', { x: xPercent, y: yPercent, sharer: sharerId === 'local' ? state.myId : sharerId });
   },
 });
 
 initFullscreen();
 initPopout();
-initViewSize();
 dom.popoutBtn.onclick = () => togglePopout();
 
 resetPanels();
@@ -87,7 +85,7 @@ dom.chatForm.onsubmit = (e) => {
 };
 
 // cronômetro da chamada — atualiza a cada segundo a partir de
-// state.callStartedAt (marcado em room.js quando o peer abre).
+// state.callStartedAt (marcado em room.js ao entrar na sala).
 setInterval(() => {
   if (!state.callStartedAt) return;
   const totalSeconds = Math.floor((Date.now() - state.callStartedAt) / 1000);

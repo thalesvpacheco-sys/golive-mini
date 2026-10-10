@@ -13,6 +13,7 @@ import { applyVolumes, updateTile } from './participants.js';
 import { saveVolumes } from './volumes.js';
 import { focusTile, unfocus, isFocusedKey, isFloating, toggleFloating, tileKey, getPref, setPref } from './layout.js';
 import { togglePopout, isPoppedOut } from './popout.js';
+import { applyVideoHidden } from './room.js';
 import { t } from './i18n.js';
 
 const LONG_PRESS_MS = 550;
@@ -92,7 +93,8 @@ function runAction(action) {
       break;
     case 'hide-video':
       p.videoHidden = !p.videoHidden;
-      updateTile(p); // o vídeo escondido também para de chegar (view-size.js)
+      updateTile(p);
+      applyVideoHidden(p); // o vídeo escondido também para de chegar
       break;
     case 'mirror':
       setPref('mirrorSelf', !getPref('mirrorSelf'));

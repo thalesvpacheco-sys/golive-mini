@@ -4,7 +4,6 @@
 
 import { dom, state } from './state.js';
 import { requestLayout, resetView, tileKey, onSpeaking } from './layout.js';
-import { startLevelMeter, stopLevelMeter, stopAllLevelMeters } from './audio-level.js';
 import { t } from './i18n.js';
 import { loadVolumes } from './volumes.js';
 
@@ -44,7 +43,8 @@ export function renderParticipantsList() {
 
 // Liga o anel verde de "tá falando" no bloco da câmera e destaca a linha
 // correspondente no painel de participantes, se ele estiver aberto.
-function setSpeaking(peerId, speaking) {
+// Quem decide quem está falando é o LiveKit (ver room.js).
+export function setSpeaking(peerId, speaking) {
   const p = state.participants.get(peerId);
   if (!p) return;
   p.speaking = speaking;
@@ -72,7 +72,7 @@ export function ensureParticipant(peerId, opts = {}) {
     screenVideoEl,
     screenTileEl: buildScreenTile(peerId, name, screenVideoEl),
     isLocal: !!opts.isLocal,
-    // a voz toca num <audio> só dela, fora do palco (ver attachStream)
+    // a voz toca num <audio> só dela, fora do palco (ver attachVoice)
     audioEl: opts.isLocal ? null : buildVoiceAudio(),
     ...loadVolumes(name), // volume, streamVolume, muted — escolhidos no menu de botão direito
   };
@@ -153,34 +153,39 @@ function buildScreenVideo(peerId) {
   return el;
 }
 
-// Voz e câmera em elementos separados. Antes a voz tocava pelo próprio
-// <video> da câmera, e um <video> só começa a tocar depois do primeiro quadro
-// de vídeo: com a câmera desligada (faixa vazia ou envio pausado pelo
-// view-size.js) nenhum quadro chega, e o áudio ficava travado junto.
-export function attachStream(peerId, stream) {
-  const p = ensureParticipant(peerId);
-  p.stream = stream;
-  if (p.isLocal) {
-    p.videoEl.srcObject = stream;
-  } else {
-    p.videoEl.srcObject = new MediaStream(stream.getVideoTracks());
-    p.audioEl.srcObject = new MediaStream(stream.getAudioTracks());
-    playVoice(p.audioEl);
-  }
-  applyVolumes(p);
-  startLevelMeter(peerId, stream, (speaking) => setSpeaking(peerId, speaking));
+// Cada faixa do LiveKit vai pro seu elemento: câmera no <video> do bloco,
+// voz num <audio> só dela (com a câmera desligada não chega quadro de vídeo,
+// e um <video> sem quadro não toca o áudio junto), tela no <video> da tela.
+// track null = solta o que estava ali.
+function swapTrack(p, slot, el, track) {
+  if (p[slot] && p[slot] !== track) p[slot].detach(el);
+  p[slot] = track;
+  if (track) track.attach(el);
 }
 
-// stream null = a transmissão acabou
-export function attachScreenStream(peerId, stream) {
+export function attachCamera(peerId, track) {
+  const p = state.participants.get(peerId);
+  if (p) swapTrack(p, 'camTrack', p.videoEl, track);
+}
+
+export function attachVoice(peerId, track) {
+  const p = state.participants.get(peerId);
+  if (!p?.audioEl) return;
+  swapTrack(p, 'voiceTrack', p.audioEl, track);
+  applyVolumes(p); // attach() mexe no muted do elemento
+  if (track) playVoice(p.audioEl);
+}
+
+// kind: 'video' | 'audio' — a tela e o som dela chegam como faixas separadas
+// e tocam juntas no mesmo <video>, com o volume da transmissão
+export function attachScreen(peerId, kind, track) {
   const p = state.participants.get(peerId);
   if (!p) return;
-  p.screenVideoEl.srcObject = stream;
+  swapTrack(p, kind === 'video' ? 'screenTrack' : 'screenAudioTrack', p.screenVideoEl, track);
   applyVolumes(p);
-  // o bloco da tela pode ainda estar escondido quando o stream chega (o
-  // aviso de "começou a compartilhar" vem por outro caminho), e autoplay não
-  // garante o play de um <video> que não está sendo desenhado.
-  if (stream) p.screenVideoEl.play().catch(() => {});
+  // o bloco da tela pode ainda estar escondido quando a faixa chega, e
+  // autoplay não garante o play de um <video> que não está sendo desenhado.
+  if (track) p.screenVideoEl.play().catch(() => {});
 }
 
 // Voz = <audio> da pessoa; transmissão = <video> da tela.
@@ -190,6 +195,7 @@ export function applyVolumes(p) {
   p.audioEl.volume = p.volume;
   p.audioEl.muted = p.muted;
   p.screenVideoEl.volume = p.streamVolume;
+  p.screenVideoEl.muted = false;
   p.tileEl.classList.toggle('locally-muted', p.muted);
   dom.participantsList?.querySelector(`li[data-peer-id="${p.peerId}"]`)?.classList.toggle('locally-muted', p.muted);
 }
@@ -235,11 +241,9 @@ export function markConnectionLost(peerId) {
 export function removeParticipant(peerId) {
   const p = state.participants.get(peerId);
   if (!p) return;
-  stopLevelMeter(peerId);
   onSpeaking(peerId, false);
   removeElements(p);
   state.participants.delete(peerId);
-  delete state.calls[peerId];
   if (state.activeSharerId === peerId) state.activeSharerId = nextSharer();
   maybeMergeBubbles();
   renderParticipantsList();
@@ -247,6 +251,7 @@ export function removeParticipant(peerId) {
 }
 
 export function removeElements(p) {
+  ['camTrack', 'voiceTrack', 'screenTrack', 'screenAudioTrack'].forEach((slot) => p[slot]?.detach());
   p.tileEl.remove();
   p.screenTileEl.remove();
   if (p.audioEl) {
@@ -254,8 +259,6 @@ export function removeElements(p) {
     p.audioEl.remove();
   }
 }
-
-export { stopAllLevelMeters };
 
 export function maybeMergeBubbles() {
   // a segunda pessoa entrando na sala = local + mais um participante

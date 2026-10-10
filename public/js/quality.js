@@ -7,8 +7,8 @@
 
 const KEY = 'golive-quality';
 
-// maxBitrate é o TETO que a gente impõe ao encoder (ver applyBitrateCap em
-// controls.js) — não é constraint de mídia, é parâmetro do RTCRtpSender.
+// maxBitrate é o TETO que a gente impõe ao encoder (ver screen-share.js)
+// — não é constraint de mídia, é parâmetro do RTCRtpSender.
 // Sem teto, o navegador tenta empurrar o preset mesmo quando o upload não
 // aguenta; o congestionamento vira buffer, e buffer é exatamente o que se
 // sente como "atraso de segundos". Os valores são folgados pra qualidade

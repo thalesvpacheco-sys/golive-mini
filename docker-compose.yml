@@ -1,5 +1,6 @@
-# Deploy numa VPS: app + TURN próprio (coturn) + HTTPS (Caddy).
-# Passo a passo em deploy/README.md. Tudo vem do .env da raiz.
+# Deploy numa VPS: app + HTTPS (Caddy). A mídia vai pelo LiveKit Cloud,
+# então não precisa de TURN próprio. Passo a passo em deploy/README.md.
+# Tudo vem do .env da raiz.
 
 x-logging: &logging
   driver: json-file
@@ -12,8 +13,6 @@ services:
     env_file: .env
     environment:
       PORT: 3000
-      TURN_URLS: "turn:${DOMAIN:?defina DOMAIN no .env}:3478?transport=udp,turn:${DOMAIN}:3478?transport=tcp"
-      TURN_SECRET: "${TURN_SECRET:?defina TURN_SECRET no .env}"
     logging: *logging
 
   caddy:
@@ -25,45 +24,11 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      DOMAIN: "${DOMAIN}"
+      DOMAIN: "${DOMAIN:?defina DOMAIN no .env}"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    logging: *logging
-
-  # Rede do host: mapear a faixa de portas de relay pelo Docker é lento e
-  # pesado. Só 3478 (UDP/TCP) e 49160-49200/UDP precisam estar abertas.
-  turn:
-    image: coturn/coturn:4.6
-    restart: unless-stopped
-    network_mode: host
-    command:
-      - --listening-port=3478
-      - --min-port=49160
-      - --max-port=49200
-      - --external-ip=${TURN_EXTERNAL_IP:?defina TURN_EXTERNAL_IP no .env}
-      - --realm=${DOMAIN}
-      - --use-auth-secret
-      - --static-auth-secret=${TURN_SECRET}
-      - --fingerprint
-      - --no-tls
-      - --no-dtls
-      - --no-cli
-      - --no-multicast-peers
-      - --log-file=stdout
-      - --simple-log
-      # nunca deixa o TURN servir de ponte pra rede interna da VPS
-      - --denied-peer-ip=0.0.0.0-0.255.255.255
-      - --denied-peer-ip=10.0.0.0-10.255.255.255
-      - --denied-peer-ip=100.64.0.0-100.127.255.255
-      - --denied-peer-ip=127.0.0.0-127.255.255.255
-      - --denied-peer-ip=169.254.0.0-169.254.255.255
-      - --denied-peer-ip=172.16.0.0-172.31.255.255
-      - --denied-peer-ip=192.168.0.0-192.168.255.255
-      - --denied-peer-ip=::1
-      - --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
-      - --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
     logging: *logging
 
 volumes:

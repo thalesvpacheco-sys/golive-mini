@@ -1,15 +1,20 @@
 # GoLive Mini
 
-Sala de tela/câmera/áudio em grupo, sem cadastro, self-hosted.
+Sala de tela/câmera/áudio em grupo, sem cadastro.
+
+Áudio, vídeo e tela passam pelo [LiveKit](https://livekit.io) (um SFU: cada
+pessoa manda a câmera uma vez pro servidor, que distribui pra sala). Por isso
+uma sala aguenta até 30 pessoas. Chat, reações e apontador vão pelo Socket.io
+do próprio servidor.
 
 ## Estrutura do projeto
 
 ```
 .
-├── server.js              # Express + Socket.io (signaling) + PeerServer
+├── server.js              # Express + token do LiveKit + Socket.io (chat/reações)
 ├── .env.example           # variáveis de ambiente (copie pra .env)
 ├── Dockerfile             # imagem do app
-├── docker-compose.yml     # deploy na VPS: app + coturn (TURN) + Caddy (HTTPS)
+├── docker-compose.yml     # deploy alternativo em VPS: app + Caddy (HTTPS)
 ├── deploy/                # Caddyfile + passo a passo do deploy em VPS
 └── public/
     ├── index.html          # markup (regiões do bento)
@@ -17,22 +22,20 @@ Sala de tela/câmera/áudio em grupo, sem cadastro, self-hosted.
     └── js/
         ├── app.js          # ponto de entrada, liga os botões
         ├── state.js        # estado global + referências de DOM
-        ├── room.js         # entrar/sair da sala, signaling, peer connections
+        ├── room.js         # entrar/sair da sala, conexão com o LiveKit
         ├── participants.js # blocos de câmera/tela de cada pessoa
         ├── layout.js       # grade / foco / faixa / mini janela no palco, estilo Discord
         ├── popout.js       # abre o palco numa janela separada (Picture-in-Picture)
-        ├── view-size.js    # resolução da câmera conforme o tamanho em que cada um vê
         ├── controls.js     # mic, câmera, reações e toasts
-        ├── screen-share.js # tela numa conexão própria + teto de bitrate + áudio estéreo
+        ├── screen-share.js # tela numa faixa própria + teto de bitrate + áudio estéreo
         ├── user-menu.js    # botão direito numa pessoa: volume da voz e da transmissão
         ├── volumes.js      # lembra o volume escolhido pra cada pessoa
-        ├── network-stats.js # RTT, perda e resolução real via getStats() + auto-degrade
+        ├── network-stats.js # RTT, perda e resolução real + auto-degrade
         ├── panels.js       # estado dos painéis (coluna no desktop, gaveta no celular)
         ├── popovers.js     # escolha de qualidade e tema (abrir/fechar é nativo)
         ├── fullscreen.js   # move a UI pra dentro de #stage em tela cheia
         ├── shortcuts.js    # atalhos de teclado (M / F / C / G / H / P / 1–9 / Esc)
         ├── chat.js         # mensagens do chat (sem histórico)
-        ├── audio-level.js  # detecta quem está falando de verdade (RMS)
         ├── quality.js      # presets de resolução/fps do compartilhamento
         ├── theme.js        # troca de tema (grafite / claro / preto)
         ├── i18n.js         # textos pt/en + detecção de idioma
@@ -71,15 +74,15 @@ o navegador bloqueia a câmera/tela.
 Veja `.env.example` para a lista completa. As principais:
 
 - `PORT` — porta do servidor (o Render injeta a dele; no docker compose é 3000).
-- `MAX_ROOM_SIZE` — limite de pessoas por sala (padrão 8).
-- `DOMAIN` / `TURN_SECRET` / `TURN_EXTERNAL_IP` — deploy na VPS (ver abaixo).
-- `TURN_URLS` + `TURN_SECRET` (ou `TURN_USERNAME` / `TURN_CREDENTIAL`) — TURN,
-  usado quando a conexão P2P direta falha (NAT simétrico, wifi corporativo).
-  Sem isso, o app usa só STUN público — funciona na maioria dos casos.
+- `MAX_ROOM_SIZE` — limite de pessoas por sala (padrão 30).
+- `LIVEKIT_URL` / `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` — projeto do
+  LiveKit Cloud (*Settings → API Keys*). Sem isso ninguém entra na sala.
+  Pra testar local sem conta, rode `livekit-server --dev` e use
+  `ws://localhost:7880`, `devkey` e `secret`.
 
 ## Deploy
 
-### Produção atual: Render + ExpressTURN
+### Produção atual: Render + LiveKit Cloud
 
 No ar em **https://toca.usagi.com.br**.
 
@@ -89,27 +92,24 @@ No ar em **https://toca.usagi.com.br**.
   - Depois de 15 min sem ninguém, o serviço dorme e o primeiro acesso leva
     ~1 min pra acordar. Durante uma chamada ele não dorme (o Socket.io manda
     sinal a cada 25s).
-- **TURN:** ExpressTURN, plano Free. No Render, em *Environment*:
+- **Mídia:** LiveKit Cloud, projeto `toca`, plano grátis. Ele já traz TURN
+  próprio, então o ExpressTURN não é mais usado. No Render, em
+  *Environment*:
 
   | Variável | Valor |
   |---|---|
-  | `TURN_URLS` | `turn:free.expressturn.com:3478,turn:free.expressturn.com:3478?transport=tcp` |
-  | `TURN_USERNAME` | usuário do painel do ExpressTURN |
-  | `TURN_CREDENTIAL` | senha do painel do ExpressTURN |
+  | `LIVEKIT_URL` | `wss://….livekit.cloud` (aparece em *Settings* do projeto) |
+  | `LIVEKIT_API_KEY` | chave criada em *Settings → API Keys* |
+  | `LIVEKIT_API_SECRET` | segredo da mesma chave |
+  | `MAX_ROOM_SIZE` | opcional, padrão 30 |
 
-  Clicar em *Refresh Credentials* no ExpressTURN troca a senha: aí é
-  preciso atualizar `TURN_CREDENTIAL` no Render. O plano grátis não tem
-  credencial temporária, então usuário/senha aparecem em `/api/ice-config`.
+  O uso (minutos de participante) aparece em *Usage* no painel do LiveKit.
 - **Domínio:** no Registro.br (zona DNS de `usagi.com.br`), um `CNAME`
   `toca` → `golive-mini.onrender.com`. No Render, o domínio está em
   *Settings → Custom Domains*, e o HTTPS é automático.
 
-Pra conferir: `https://toca.usagi.com.br/api/ice-config` deve listar o
-servidor do ExpressTURN.
-
 ### Alternativa: VPS própria
 
-Se um dia quiserem sair do Render: uma VPS roda tudo com
-`docker compose up -d --build` (o app, um TURN próprio com coturn e o Caddy
-com HTTPS automático). O passo a passo está em
-[`deploy/README.md`](deploy/README.md).
+Se um dia quiserem sair do Render: uma VPS roda o app e o Caddy (HTTPS
+automático) com `docker compose up -d --build`, e a mídia continua no
+LiveKit Cloud. O passo a passo está em [`deploy/README.md`](deploy/README.md).

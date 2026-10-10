@@ -60,14 +60,10 @@ export const dom = {
 };
 
 export const state = {
-  socket: null,
-  peer: null,
-  localStream: null,
-  screenStream: null, // tela que EU estou transmitindo (conexão própria, ver screen-share.js)
-  screenCalls: {}, // peerId -> MediaConnection da minha tela
-  calls: {}, // peerId -> MediaConnection
+  socket: null, // chat, reações e apontador
+  room: null, // LiveKit Room: áudio, vídeo, tela e quem está na sala
+  myId: '', // minha identity no LiveKit (os outros me conhecem por ela)
   participants: new Map(), // peerId -> participant state
-  leftPeers: new Set(), // peerIds que saíram de propósito (via 'user-left')
   nextColorIndex: 0,
   activeSharerId: null, // transmissão mais recente, a que ganha o foco (null = ninguém)
   micEnabled: false,
@@ -77,6 +73,6 @@ export const state = {
   myName: '',
   myColor: '',
   roomId: '',
-  callStartedAt: null, // Date.now() de quando o peer abriu — cronômetro do header
+  callStartedAt: null, // Date.now() de quando entrei na sala — cronômetro do header
   unreadChat: 0,
 };

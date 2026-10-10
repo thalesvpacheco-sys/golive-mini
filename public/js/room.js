@@ -1,19 +1,21 @@
-// Entrar/sair da sala, conexão com o signaling (Socket.io) e o mesh WebRTC (PeerJS).
+// Entrar/sair da sala. Áudio, vídeo, tela e quem está na sala vêm do LiveKit
+// (SFU: cada um manda a câmera uma vez pro servidor, que distribui); chat,
+// reações e apontador continuam pelo Socket.io.
 
 import { dom, state } from './state.js';
-import { ensureParticipant, attachStream, removeParticipant, removeElements, markConnectionLost, setSharingScreen, updateTile, renderParticipantsList, stopAllLevelMeters } from './participants.js';
+import { ensureParticipant, attachCamera, attachVoice, attachScreen, removeParticipant, removeElements, setSharingScreen, setSpeaking, updateTile, renderParticipantsList } from './participants.js';
 import { resetLayout } from './layout.js';
 import { spawnReaction, spawnPointerPing, showToast, toggleCinemaMode } from './controls.js';
 import { t, translateServerMessage } from './i18n.js';
 import { appendChatMessage, clearChat } from './chat.js';
 import { isPanelOpen, resetPanels } from './panels.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './network-stats.js';
-import { callWithScreen, receiveScreenCall, closeScreenCallsWith, resetScreenShare } from './screen-share.js';
+import { screenShareEnded, resetScreenShare } from './screen-share.js';
 import { closeUserMenuFor } from './user-menu.js';
-import { createPlaceholderStream, releasePlaceholders } from './local-media.js';
 import { closePopovers } from './popovers.js';
-import { joinViewSize, leaveViewSize, resendViewSizes, watchCall, forgetPeer } from './view-size.js';
 import { closePopout } from './popout.js';
+
+const { Room, RoomEvent, Track, VideoPresets, ConnectionQuality } = window.LivekitClient;
 
 const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
 
@@ -28,20 +30,6 @@ const ROOM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
   dom.nameInput.value = localStorage.getItem('golive-last-name') || '';
   (dom.nameInput.value ? dom.roomInput : dom.nameInput).focus();
 })();
-
-// Busca a config de ICE (STUN/TURN) do backend antes de abrir qualquer Peer.
-// Sem isso o app funciona igual antes (só STUN público), mas se você configurar
-// um TURN via variáveis de ambiente no servidor, ele passa a ser usado aqui.
-async function fetchIceConfig() {
-  try {
-    const res = await fetch('/api/ice-config');
-    if (!res.ok) throw new Error('bad status');
-    return await res.json();
-  } catch (e) {
-    console.warn('Não deu pra buscar ice-config do servidor, seguindo só com STUN padrão.', e);
-    return {};
-  }
-}
 
 // ---------- reconexão ----------
 // Atualiza o statusinho do cabeçalho + a bolinha de "online" conforme o
@@ -61,22 +49,131 @@ function setConnectionState(kind) {
   }
 }
 
-let lastRejoinAt = 0;
-// Reentra na sala do lado do servidor (que esqueceu a gente assim que o
-// socket caiu). Chamada tanto quando o SOCKET reconecta quanto quando o
-// PEER reconecta — numa queda de internet real os dois costumam cair
-// junto, então o debounce evita mandar 'join-room' duplicado em sequência.
-function rejoinIfNeeded() {
-  if (!state.roomId || !state.peer || state.peer.destroyed || !state.peer.id) return;
-  const now = Date.now();
-  if (now - lastRejoinAt < 2000) return;
-  lastRejoinAt = now;
-  state.socket.emit('join-room', { roomId: state.roomId, peerId: state.peer.id, name: state.myName });
-  // numa reconexão a sala pode ter perdido algum toggle de mic/câmera feito
-  // enquanto o socket estava caído — reenvia o estado atual
-  state.socket.emit('media-state', { cam: state.camEnabled, mic: state.micEnabled });
-  resendViewSizes(); // o servidor esqueceu quem estava vendo o quê
-  setConnectionState('ok');
+function joinSocketRoom() {
+  if (!state.roomId || !state.myId) return;
+  state.socket.emit('join-room', { roomId: state.roomId, peerId: state.myId, name: state.myName });
+}
+
+async function fetchToken() {
+  const res = await fetch('/api/livekit-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomId: state.roomId, name: state.myName }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.token) throw new Error(body.message || '');
+  return body;
+}
+
+// 'local' é a chave do meu bloco; os outros são conhecidos pela identity
+function keyOf(participant) {
+  return participant.isLocal ? 'local' : participant.identity;
+}
+
+function ensureRemote(participant) {
+  return ensureParticipant(participant.identity, { name: participant.name || participant.identity.slice(0, 6) });
+}
+
+// Mic, câmera e tela de cada um saem direto das publicações do LiveKit —
+// não tem mais aviso separado pelo socket que possa se perder numa queda.
+function syncParticipant(participant) {
+  const key = keyOf(participant);
+  const p = state.participants.get(key);
+  if (!p) return;
+  const live = (source) => {
+    const pub = participant.getTrackPublication(source);
+    return !!pub && !pub.isMuted;
+  };
+  p.mic = live(Track.Source.Microphone);
+  p.cam = live(Track.Source.Camera);
+  const sharing = !!participant.getTrackPublication(Track.Source.ScreenShare);
+  if (sharing !== p.sharingScreen) setSharingScreen(key, sharing);
+  updateTile(p);
+  renderParticipantsList();
+}
+
+function routeTrack(key, source, track) {
+  if (source === Track.Source.Camera) attachCamera(key, track);
+  else if (source === Track.Source.Microphone) attachVoice(key, track);
+  else if (source === Track.Source.ScreenShare) attachScreen(key, 'video', track);
+  else if (source === Track.Source.ScreenShareAudio) attachScreen(key, 'audio', track);
+}
+
+// "Ocultar vídeo" no menu do botão direito: além de esconder, para de receber
+// a câmera dessa pessoa (o LiveKit deixa de mandar pra mim).
+export function applyVideoHidden(p) {
+  state.room?.remoteParticipants.get(p.peerId)
+    ?.getTrackPublication(Track.Source.Camera)
+    ?.setEnabled(!p.videoHidden);
+}
+
+// O navegador pode bloquear som antes de um clique na página; o LiveKit
+// avisa e a gente libera no próximo clique.
+function unlockAudioOnNextClick(room) {
+  if (room.canPlaybackAudio) return;
+  document.addEventListener('pointerdown', () => room.startAudio().catch(() => {}), { once: true });
+}
+
+function wireRoom(room) {
+  room
+    .on(RoomEvent.ParticipantConnected, (participant) => {
+      const p = ensureRemote(participant);
+      showToast(t('toast.joined', { name: p.name }));
+      syncParticipant(participant);
+    })
+    .on(RoomEvent.ParticipantDisconnected, (participant) => {
+      const p = state.participants.get(participant.identity);
+      if (p) showToast(t('toast.left', { name: p.name }));
+      closeUserMenuFor(participant.identity);
+      removeParticipant(participant.identity);
+    })
+    .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      const p = ensureRemote(participant);
+      routeTrack(participant.identity, track.source, track);
+      if (track.source === Track.Source.Camera) applyVideoHidden(p);
+      syncParticipant(participant);
+    })
+    .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      routeTrack(participant.identity, track.source, null);
+      syncParticipant(participant);
+    })
+    .on(RoomEvent.TrackPublished, (publication, participant) => {
+      ensureRemote(participant);
+      syncParticipant(participant);
+    })
+    .on(RoomEvent.TrackUnpublished, (publication, participant) => syncParticipant(participant))
+    .on(RoomEvent.TrackMuted, (publication, participant) => syncParticipant(participant))
+    .on(RoomEvent.TrackUnmuted, (publication, participant) => syncParticipant(participant))
+    .on(RoomEvent.LocalTrackPublished, (publication, participant) => {
+      if (publication.source === Track.Source.Camera) attachCamera('local', publication.track);
+      if (publication.source === Track.Source.ScreenShare) attachScreen('local', 'video', publication.track);
+      syncParticipant(participant);
+    })
+    .on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
+      if (publication.source === Track.Source.Camera) attachCamera('local', null);
+      // inclusive pelo botão nativo "Parar de compartilhar" do navegador
+      if (publication.source === Track.Source.ScreenShare) screenShareEnded();
+      syncParticipant(participant);
+    })
+    .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+      const talking = new Set(speakers.map(keyOf));
+      state.participants.forEach((p, key) => {
+        if (p.speaking !== talking.has(key)) setSpeaking(key, talking.has(key));
+      });
+    })
+    .on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+      if (participant.isLocal) return;
+      const p = state.participants.get(participant.identity);
+      const lost = quality === ConnectionQuality.Lost;
+      if (p && p.lost !== lost) { p.lost = lost; updateTile(p); }
+    })
+    .on(RoomEvent.AudioPlaybackStatusChanged, () => unlockAudioOnNextClick(room))
+    // quedas de rede: o LiveKit reconecta sozinho, sem refazer a sala
+    .on(RoomEvent.Reconnecting, () => setConnectionState('reconnecting'))
+    .on(RoomEvent.Reconnected, () => setConnectionState('ok'))
+    .on(RoomEvent.Disconnected, () => {
+      if (state.room === room) setConnectionState('lost'); // saída normal já limpou state.room
+    });
 }
 
 async function joinRoom() {
@@ -100,88 +197,48 @@ async function joinRoom() {
   if (typedName) localStorage.setItem('golive-last-name', typedName);
 
   // Entra sem pedir câmera nem mic: o navegador só pergunta quando a pessoa
-  // ligar um deles (ver local-media.js). Criado aqui, antes de qualquer await,
-  // pra ainda contar como resposta ao clique — o AudioContext do silêncio
-  // precisa disso pra não nascer bloqueado.
-  state.localStream = createPlaceholderStream();
+  // ligar um deles (ver controls.js).
+  const room = new Room({
+    adaptiveStream: true, // cada vídeo chega no tamanho em que está sendo mostrado (e pausa escondido)
+    dynacast: true, // camada de câmera que ninguém está vendo para de ser enviada
+    videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+    publishDefaults: { videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360] },
+  });
+  state.room = room;
+  wireRoom(room);
+
+  try {
+    const { url, token, identity } = await fetchToken();
+    if (state.room !== room) return; // saiu enquanto esperava
+    state.myId = identity;
+    await room.connect(url, token);
+  } catch (e) {
+    if (state.room !== room) return;
+    console.error('Não deu pra entrar na sala:', e);
+    showToast(e.message ? translateServerMessage(e.message) : t('alert.joinErrorDefault'), { holdMs: 6000 });
+    leaveRoom();
+    return;
+  }
+  if (state.room !== room) return;
 
   ensureParticipant('local', { name: `${state.myName} (${t('participant.you')})`, isLocal: true });
-  attachStream('local', state.localStream);
-
-  const iceConfig = await fetchIceConfig();
-
-  state.peer = new Peer(undefined, {
-    host: location.hostname,
-    port: location.port || (location.protocol === 'https:' ? 443 : 80),
-    path: '/peerjs',
-    secure: location.protocol === 'https:',
-    config: iceConfig.iceServers ? { iceServers: iceConfig.iceServers } : undefined,
-  });
-
-  state.peer.on('error', (err) => {
-    console.error('Peer error:', err);
-    dom.statusEl.textContent = t('status.error', { detail: err.type || err.message });
-  });
-
-  // A rede caiu um instante (wifi oscilando, celular trocando de rede etc):
-  // o Peer perde só a conexão de SINALIZAÇÃO com o servidor, mas o objeto
-  // continua de pé com o mesmo id — .reconnect() tenta recuperar sem
-  // precisar destruir e recriar tudo do zero.
-  state.peer.on('disconnected', () => {
-    if (state.peer.destroyed) return;
-    setConnectionState('reconnecting');
-    state.peer.reconnect();
-  });
-  // já isso aqui é o Peer morrendo de vez (não dá pra só reconectar) — o
-  // caminho mais simples e confiável nesse caso é pedir pra recarregar.
-  state.peer.on('close', () => setConnectionState('lost'));
-
-  state.peer.on('open', () => {
-    dom.joinSection.style.display = 'none';
-    dom.appEl.classList.add('active');
-    // só marca o início UMA vez — reconexão (peer reabrindo depois de uma
-    // queda) não é uma chamada nova, o cronômetro não deve voltar a zero.
-    if (!state.callStartedAt) state.callStartedAt = Date.now();
-    startNetworkMonitor(); // reinicia limpo a cada open, inclusive em reconexão
-    rejoinIfNeeded(); // primeira entrada OU peer voltando de uma reconexão
-  });
-
-  // alguem chegou depois de mim -> eu ligo pra ele, mandando meu estado atual
-  // (isRejoin=true quando é alguém que já estava na sala e só reconectou —
-  // ver server.js — pra não mostrar "entrou na sala" numa reconexão)
-  state.socket.on('user-joined', ({ peerId: newPeerId, name, isRejoin }) => {
-    ensureParticipant(newPeerId, { name });
-    if (!isRejoin) showToast(t('toast.joined', { name }));
-    const call = state.peer.call(newPeerId, state.localStream, {
-      metadata: { name: state.myName, cam: state.camEnabled, mic: state.micEnabled, sharingScreen: state.isScreenSharing },
+  // quem já estava na sala antes de mim
+  room.remoteParticipants.forEach((participant) => {
+    ensureRemote(participant);
+    participant.trackPublications.forEach((pub) => {
+      if (pub.track) routeTrack(participant.identity, pub.source, pub.track);
     });
-    registerCall(newPeerId, call);
-    // chegou no meio de uma transmissão minha: a tela vai numa conexão à parte
-    if (state.isScreenSharing) callWithScreen(newPeerId);
+    syncParticipant(participant);
   });
+  unlockAudioOnNextClick(room);
 
-  state.socket.on('user-left', (goneId) => {
-    state.leftPeers.add(goneId);
-    const leaving = state.participants.get(goneId);
-    if (leaving) showToast(t('toast.left', { name: leaving.name }));
-    closeScreenCallsWith(goneId);
-    closeUserMenuFor(goneId);
-    forgetPeer(goneId);
-    removeParticipant(goneId);
-  });
+  dom.joinSection.style.display = 'none';
+  dom.appEl.classList.add('active');
+  state.callStartedAt = Date.now();
+  setConnectionState('ok');
+  startNetworkMonitor();
 
-  state.socket.on('screen-share', ({ peerId: fromId, sharing }) => {
-    if (!sharing) closeScreenCallsWith(fromId); // não espera o ICE notar sozinho, demora
-    setSharingScreen(fromId, sharing);
-  });
-
-  state.socket.on('media-state', ({ peerId: fromId, cam, mic }) => {
-    const p = state.participants.get(fromId);
-    if (!p) return;
-    p.cam = cam; p.mic = mic;
-    updateTile(p);
-    renderParticipantsList();
-  });
+  joinSocketRoom();
 
   state.socket.on('reaction', ({ peerId: fromId, emoji }) => {
     const sender = state.participants.get(fromId);
@@ -193,7 +250,7 @@ async function joinRoom() {
   state.socket.on('pointer', ({ peerId: fromId, x, y, sharer }) => {
     const sender = state.participants.get(fromId);
     // `sharer` = de quem é a tela apontada (pode haver várias transmissões)
-    const sharerId = sharer === state.peer?.id ? 'local' : sharer;
+    const sharerId = sharer === state.myId ? 'local' : sharer;
     spawnPointerPing(x, y, sender?.name, sharerId);
   });
 
@@ -207,81 +264,24 @@ async function joinRoom() {
       dom.chatBadge.hidden = false;
     }
   });
-
-  joinViewSize();
-
-  state.socket.on('join-error', ({ message }) => {
-    showToast(message ? translateServerMessage(message) : t('alert.joinErrorDefault'));
-    leaveRoom();
-  });
-
-  // alguem me ligando -> eu atendo (recebo o estado dele via metadata)
-  state.peer.on('call', (call) => {
-    if (call.metadata?.kind === 'screen') {
-      receiveScreenCall(call);
-      return;
-    }
-    call.answer(state.localStream);
-    const meta = call.metadata || {};
-    const p = ensureParticipant(call.peer, { name: meta.name });
-    p.cam = !!meta.cam;
-    p.mic = !!meta.mic;
-    updateTile(p);
-    registerCall(call.peer, call);
-    if (meta.sharingScreen) setSharingScreen(call.peer, true);
-  });
-}
-
-function registerCall(peerId, call) {
-  // reconexão: a chamada nova substitui a antiga, que é fechada aqui
-  const previous = state.calls[peerId];
-  state.calls[peerId] = call;
-  if (previous && previous !== call) { try { previous.close(); } catch (e) {} }
-  watchCall(peerId, call); // resolução da câmera conforme o tamanho em que a pessoa vê
-  call.on('stream', (remoteStream) => {
-    attachStream(peerId, remoteStream);
-    const p = state.participants.get(peerId);
-    if (p?.lost) { p.lost = false; updateTile(p); } // voltou depois de uma queda
-  });
-  call.on('close', () => {
-    // a chamada antiga de uma reconexão fechando não é queda: já tem outra no lugar
-    if (state.calls[peerId] !== call) return;
-    // pode ser saida normal (user-left ja chegou/vai chegar) ou queda de conexao
-    setTimeout(() => {
-      if (!state.participants.has(peerId)) return; // ja removido normalmente
-      if (state.leftPeers.has(peerId)) { removeParticipant(peerId); return; }
-      markConnectionLost(peerId);
-    }, 600);
-  });
 }
 
 function leaveRoom() {
   closePopout(); // o palco volta pra página antes de tudo ser desmontado
-  state.roomId = ''; // limpa ANTES de desconectar o socket, senão o handler
-                      // de 'disconnect' acha que é uma queda de conexão de
-                      // verdade e mostra "Reconectando..." numa saída normal.
-  resetScreenShare(); // a tela não está no localStream, então não para junto com os tracks dele
-  Object.values(state.calls).forEach(c => { try { c.close(); } catch (e) {} });
-  state.calls = {};
-  if (state.peer) { state.peer.destroy(); state.peer = null; }
-  if (state.localStream) { state.localStream.getTracks().forEach(t => t.stop()); state.localStream = null; }
-  releasePlaceholders();
-  stopAllLevelMeters();
+  state.roomId = '';
+  resetScreenShare();
+  const room = state.room;
+  state.room = null; // antes do disconnect: o aviso de 'Disconnected' não é queda
+  room?.disconnect(); // também para câmera, mic e tela
+  state.myId = '';
   stopNetworkMonitor();
-  state.socket.removeAllListeners('user-joined');
-  state.socket.removeAllListeners('user-left');
-  state.socket.removeAllListeners('screen-share');
-  state.socket.removeAllListeners('media-state');
   state.socket.removeAllListeners('reaction');
   state.socket.removeAllListeners('pointer');
   state.socket.removeAllListeners('chat-message');
-  state.socket.removeAllListeners('view-size');
-  leaveViewSize();
   state.socket.disconnect();
 
   state.participants.forEach(removeElements);
   state.participants.clear();
-  state.leftPeers.clear();
   state.nextColorIndex = 0;
   state.activeSharerId = null;
   state.micEnabled = false;
@@ -318,18 +318,9 @@ function leaveRoom() {
 export function initRoom() {
   state.socket = io();
 
-  // O Socket.io já tenta reconectar sozinho por padrão (é só a conexão de
-  // sinalização caindo e voltando) — o trabalho aqui é só: quando ele voltar
-  // DEPOIS de já estarmos numa sala, o servidor esqueceu a gente (o
-  // server.js tira da sala assim que o socket desconecta), então reentra.
-  let hasEverConnected = false;
-  state.socket.on('connect', () => {
-    if (hasEverConnected) rejoinIfNeeded();
-    hasEverConnected = true;
-  });
-  state.socket.on('disconnect', () => {
-    if (state.roomId && state.peer && !state.peer.destroyed) setConnectionState('reconnecting');
-  });
+  // O Socket.io reconecta sozinho; o servidor esqueceu em que sala a gente
+  // estava (só pro chat/reações), então reentra.
+  state.socket.on('connect', joinSocketRoom);
 
   dom.joinSection.style.display = 'flex';
 
