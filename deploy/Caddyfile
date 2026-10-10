@@ -1,0 +1,6 @@
+# HTTPS automático (Let's Encrypt) pro domínio do .env. Caddy repassa
+# WebSocket (Socket.io / PeerJS) sem configuração extra.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000
+}

@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const http = require('http');
+const crypto = require('crypto');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -14,6 +15,9 @@ const MAX_NAME_LENGTH = 40;
 const MAX_ROOM_SIZE = Number(process.env.MAX_ROOM_SIZE) || 8;
 
 const app = express();
+// Atrás de um proxy (Caddy na VPS, ou o do Railway): sem isso o rate limit
+// enxerga todo mundo com o IP do proxy e bloqueia a sala inteira junta.
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -39,11 +43,20 @@ app.get('/api/ice-config', (req, res) => {
   const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
 
   if (process.env.TURN_URLS) {
-    iceServers.push({
-      urls: process.env.TURN_URLS.split(',').map((s) => s.trim()),
-      username: process.env.TURN_USERNAME,
-      credential: process.env.TURN_CREDENTIAL,
-    });
+    const urls = process.env.TURN_URLS.split(',').map((s) => s.trim());
+    if (process.env.TURN_SECRET) {
+      // coturn com use-auth-secret: credencial temporária (24h) assinada com o
+      // segredo compartilhado — a senha de verdade nunca chega no navegador.
+      const username = `${Math.floor(Date.now() / 1000) + 24 * 3600}:golive`;
+      const credential = crypto.createHmac('sha1', process.env.TURN_SECRET).update(username).digest('base64');
+      iceServers.push({ urls, username, credential });
+    } else {
+      iceServers.push({
+        urls,
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
+      });
+    }
   }
 
   res.json({ iceServers });
@@ -169,7 +182,7 @@ server.listen(PORT, () => {
   console.log(`GoLive Mini rodando em http://localhost:${PORT}`);
 });
 
-// encerramento gracioso (Railway manda SIGTERM em redeploy)
+// encerramento gracioso (Docker/Railway mandam SIGTERM em redeploy)
 process.on('SIGTERM', () => {
   console.log('SIGTERM recebido, fechando servidor...');
   server.close(() => process.exit(0));

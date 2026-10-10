@@ -8,6 +8,9 @@ Sala de tela/câmera/áudio em grupo, sem cadastro, self-hosted.
 .
 ├── server.js              # Express + Socket.io (signaling) + PeerServer
 ├── .env.example           # variáveis de ambiente (copie pra .env)
+├── Dockerfile             # imagem do app
+├── docker-compose.yml     # deploy na VPS: app + coturn (TURN) + Caddy (HTTPS)
+├── deploy/                # Caddyfile + passo a passo do deploy
 └── public/
     ├── index.html          # markup (regiões do bento)
     ├── css/style.css       # estilo, tokens OKLCH e o grid do bento
@@ -60,31 +63,23 @@ ex: `galera01`) e manda o mesmo link + ID pros amigos.
 
 ⚠️ **Importante:** `getDisplayMedia`/`getUserMedia` só funcionam em `https://`
 ou em `localhost`. Pra usar com amigos remotos, precisa hospedar com HTTPS
-(Railway, Render, um VPS com Caddy/Nginx + Let's Encrypt, etc.) — em HTTP puro
+(ver [Deploy](#deploy-vps)) — em HTTP puro
 o navegador bloqueia a câmera/tela.
 
 ## Variáveis de ambiente
 
 Veja `.env.example` para a lista completa. As principais:
 
-- `PORT` — porta do servidor (o Railway injeta a dele própria automaticamente).
+- `PORT` — porta do servidor (no docker compose é fixada em 3000).
 - `MAX_ROOM_SIZE` — limite de pessoas por sala (padrão 8).
-- `TURN_URLS` / `TURN_USERNAME` / `TURN_CREDENTIAL` — servidor TURN opcional,
+- `DOMAIN` / `TURN_SECRET` / `TURN_EXTERNAL_IP` — deploy na VPS (ver abaixo).
+- `TURN_URLS` + `TURN_SECRET` (ou `TURN_USERNAME` / `TURN_CREDENTIAL`) — TURN,
   usado quando a conexão P2P direta falha (NAT simétrico, wifi corporativo).
-  Sem isso, o app usa só STUN público — funciona na grande maioria dos casos.
+  Sem isso, o app usa só STUN público — funciona na maioria dos casos.
 
-## Deploy (Railway)
+## Deploy (VPS)
 
-Auto Deploy habilitado: push na `main` redeploya sozinho. Configure as
-variáveis de ambiente acima no painel do serviço se quiser mudar os padrões.
-
-## Limites conhecidos
-
-- **Topologia mesh:** funciona bem até ~4-6 pessoas por sala (`MAX_ROOM_SIZE`
-  bloqueia entradas além do limite configurado). Acima disso o upload de quem
-  compartilha tela sofre (cada peer é uma conexão separada).
-- **Estado em memória:** a lista de quem está em cada sala vive só na RAM do
-  processo. Um redeploy/restart do servidor derruba todo mundo (precisa
-  reentrar na sala, mas nada é perdido além disso).
-- **Sem persistência/autenticação:** qualquer pessoa com o ID da sala entra.
-  Suficiente pro uso pessoal, mas não é pensado pra uso público.
+Uma VPS roda tudo com `docker compose up -d --build`: o app, um TURN próprio
+(coturn, sem prazo de validade) e o Caddy com HTTPS automático. Passo a passo
+(Oracle Cloud grátis, subdomínio no Registro.br, portas) em
+[`deploy/README.md`](deploy/README.md).
